@@ -22,29 +22,6 @@ npm install -g is-malicious
 is-malicious /path/to/project
 ```
 
-## Usage
-
-```text
-is-malicious [path] [options]
-```
-
-| Option | What it does | Default |
-| --- | --- | --- |
-| `--json` | Print the full report as JSON | Off |
-| `--model <name>` | Choose a Jev model | `jev-latest` |
-| `--concurrency <n>` | Set the number of parallel chunk requests | `12` |
-| `--min-prob <n>` | Set the minimum category probability to report | `0.40` |
-| `--diff-from <ref>` | Scan only files changed since a Git ref | Scan all eligible files |
-| `-h`, `--help` | Show help | |
-
-For example, scan files changed since `origin/main`:
-
-```bash
-is-malicious . --diff-from origin/main
-```
-
-This scans the changed files, not just the changed lines, so you can review a PR without paying to rescan the whole project.
-
 ## Reading the report
 
 <img width="1106" height="341" alt="Screenshot 2026-09-18 at 19 35 35" src="https://github.com/user-attachments/assets/611c979a-8dd4-4fc8-8963-0843314e6a55" />
@@ -148,6 +125,29 @@ The agent runs `npx is-malicious`, so `TYPESAFE_API_KEY` must be set in its envi
 If Jev returns `max_tokens_exceeded`, the scanner splits the chunk and retries.
 
 Jev answers typed questions using `noul`, `choice`, and `score`. Noul answers have no separate confidence field, so the report calculates confidence as `2 * |p - 0.5|`. Probabilities of `0.91` and `0.09` therefore have the same confidence, though they point to opposite answers.
+
+## Usage
+
+```text
+is-malicious [path] [options]
+```
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `--json` | Print the full report as JSON | Off |
+| `--model <name>` | Choose a Jev model | `jev-latest` |
+| `--concurrency <n>` | Set the number of parallel chunk requests | `12` |
+| `--min-prob <n>` | Set the minimum category probability to report | `0.40` |
+| `--diff-from <ref>` | Scan only files changed since a Git ref | Scan all eligible files |
+| `-h`, `--help` | Show help | |
+
+For example, scan files changed since `origin/main`:
+
+```bash
+is-malicious . --diff-from origin/main
+```
+
+This scans the changed files, not just the changed lines, so you can review a PR without paying to rescan the whole project.
 
 ## Development
 
