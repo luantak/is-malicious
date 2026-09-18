@@ -275,7 +275,7 @@ export function excerpt(file: SourceFile, start: number, end: number, pad = 1): 
 
 export function taggedFileState(
   file: SourceFile,
-  mode: "triage" | "full" = "triage",
+  mode: "triage" | "full" = "full",
 ): {
   path: string;
   role: string;

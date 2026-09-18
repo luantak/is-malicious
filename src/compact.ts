@@ -3,9 +3,6 @@ import type { SourceFile } from "./types";
 
 export const DEFAULT_MAX_FILES_PER_CHUNK = 16;
 
-const IMPORT_LINE =
-  /^\s*(import|export\s+.+\s+from|require\s*\(|from\s+\S+\s+import|using\s+\S+|require_once|include(_once)?\s*\(|#include)\b/;
-
 const SIGNAL_PATTERNS: RegExp[] = [
   /\b(fetch|axios|XMLHttpRequest|WebSocket|http\.request|https\.request|net\.connect|ipcRenderer)\b/i,
   /\bhttps?:\/\/|\bftp:\/\/|\bwss:\/\//i,
@@ -114,59 +111,13 @@ export function textHasSignal(text: string): boolean {
   return lineHasSignal(text);
 }
 
-export function shouldSendFull(file: SourceFile): boolean {
-  if (file.role === "ci" || file.role === "build") {
-    return true;
-  }
-  const base = path.basename(file.relativePath).toLowerCase();
-  if (KEEP_JSON_NAMES.has(base) || base === "dockerfile" || base === "makefile" || base === "containerfile") {
-    return true;
-  }
-  const ext = path.extname(base);
-  return ext === ".sh" || ext === ".bash" || ext === ".zsh" || ext === ".ps1";
-}
-
 export function looksPacked(line: string): boolean {
   const trimmed = line.trim();
   return trimmed.length >= 160 && (trimmed.match(/[;{}()]/g)?.length ?? 0) >= 8;
 }
 
-export function isImportLine(line: string): boolean {
-  return IMPORT_LINE.test(line);
-}
-
 export function compactLineIndexes(file: SourceFile): number[] {
-  if (shouldSendFull(file)) {
-    return collapseBlankIndexes(file.lines);
-  }
-
-  const keep = new Set<number>();
-  const total = file.lines.length;
-  const head = Math.min(12, total);
-  const tail = Math.min(8, total);
-  for (let index = 0; index < head; index += 1) {
-    keep.add(index);
-  }
-  for (let index = Math.max(head, total - tail); index < total; index += 1) {
-    keep.add(index);
-  }
-
-  for (let index = 0; index < total; index += 1) {
-    const line = file.lines[index];
-    if (lineHasSignal(line) || looksPacked(line) || isImportLine(line)) {
-      for (let around = Math.max(0, index - 1); around <= Math.min(total - 1, index + 1); around += 1) {
-        keep.add(around);
-      }
-    }
-  }
-
-  if (keep.size >= total * 0.7) {
-    return collapseBlankIndexes(file.lines);
-  }
-
-  return [...keep]
-    .sort((a, b) => a - b)
-    .filter((index) => file.lines[index].trim().length > 0);
+  return collapseBlankIndexes(file.lines);
 }
 
 export function collapseBlankIndexes(lines: string[]): number[] {
@@ -186,14 +137,14 @@ export function collapseBlankIndexes(lines: string[]): number[] {
   return indexes;
 }
 
-export function fileStateText(file: SourceFile, mode: "triage" | "full" = "triage"): string {
-  const indexes = mode === "full" ? collapseBlankIndexes(file.lines) : compactLineIndexes(file);
+export function fileStateText(file: SourceFile, _mode: "triage" | "full" = "full"): string {
+  const indexes = collapseBlankIndexes(file.lines);
   const base = file.lineOffset ?? 0;
   return indexes.map((index) => `${base + index + 1}| ${file.lines[index]}`).join("\n");
 }
 
 export function compactCharCount(file: SourceFile): number {
-  return fileStateText(file, "triage").length;
+  return fileStateText(file).length;
 }
 
 export function interestingLocalLines(file: SourceFile): number[] {

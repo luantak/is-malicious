@@ -9,9 +9,9 @@ It is a second opinion on a tree you have not read yet. It is not a verdict, and
 - A **semantic** scan. Jev sees file text and answers typed questions (`noul`, `choice`, `score`). It does not grep for a malware signature list and stop there.
 - A **behavior** scan. The questions are about theft, exfil, hidden network use, decode-and-run, permission abuse, persistence, stealth, deception, and dirty CI. Ordinary powerful code (your own API key, a documented host, a worker, a normal deploy job) is supposed to score low.
 - A **pointer**. Findings name a chunk, a file, a line range, a category, a probability, and a closed reason label. Jev does not write an essay.
-- A **paid API client**. Input tokens are billed. Output tokens are free. A large monorepo can still cost tens of cents even after the skim. The report prints the actual bill.
+- A **paid API client**. Input tokens are billed. Output tokens are free. The report prints the actual bill.
 
-The first pass skims. Imports, the top and bottom of each file, and lines that look like network, eval, secrets, persistence, or payload decoding (`atob`, `Buffer.from`, `base64`, long blobs, `\x` escapes) go to Jev. CI, install scripts, and `package.json` go in full. A second pass runs only on hot or uncertain chunks and windows the file Jev pointed at.
+The first pass sends each scanned file in full. Extra blank lines are collapsed. Files that do not fit the chunk budget are split and sent as consecutive slices, still with every line. A second pass runs only on hot or uncertain chunks and windows the file Jev pointed at.
 
 ## What this is not
 
@@ -20,7 +20,7 @@ The first pass skims. Imports, the top and bottom of each file, and lines that l
 - **Not a secret scanner.** It looks for code that *steals* secrets. It does not inventory keys you already committed. Use gitleaks or trufflehog for that.
 - **Not a sandbox.** A clean report does not make `npm install` or `curl | bash` safe. Install scripts and postinstall hooks can still fire.
 - **Not proof.** A high score means Jev thinks that span looks hostile. A low score means it did not see that in the text it was shown. Either can be wrong.
-- **Not complete.** It honors `.gitignore`, skips binaries, images, lockfiles, generated bundles, `tsconfig`, compiled `dist`/`lib`/`build` output, and boring JSON. Malice that lives only there will not be read. A custom XOR decoder or `decodeURIComponent` puzzle with no other signals can also get dropped from the skim.
+- **Not complete.** It honors `.gitignore`, skips binaries, images, lockfiles, generated bundles, `tsconfig`, compiled `dist`/`lib`/`build` output, and boring JSON. Malice that lives only there will not be read.
 - **Not a substitute for reading the code you are about to run.**
 
 If you need to know whether a dependency has a known vuln, or whether a binary is malware, use the tool built for that. This one answers a narrower question: does this source tree look like it is trying to hide something.
@@ -42,7 +42,7 @@ These categories live in `src/checks/builtin.ts`. Add an object and register it.
 ## How a scan runs
 
 1. Recurse from the given path. Honor `.gitignore` the way git does (`git ls-files --exclude-standard` when the tree is a repo). Skip the noise listed above. If Jev returns `max_tokens_exceeded`, the scanner splits that chunk and retries.
-2. Group files that share a directory, packing by the skim size.
+2. Group files that share a directory, splitting when a chunk would blow the character budget.
 3. First pass: one Jev request per chunk, every category asked together.
 4. Second pass only if a category is hot or near 0.5, or the overall risk score is high.
 5. Print paths, line ranges, category, probability, confidence, and the reason label.

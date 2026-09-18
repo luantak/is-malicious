@@ -159,7 +159,7 @@ export function chunkState(
       files:
         mode === "locate"
           ? files.map((file) => ({ path: file.relativePath, role: file.role }))
-          : files.map((file) => taggedFileState(file, "triage")),
+          : files.map((file) => taggedFileState(file, "full")),
     },
     ...(options.windows
       ? {

