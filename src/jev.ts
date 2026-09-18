@@ -148,18 +148,22 @@ export function buildPass2Questions(
 export function chunkState(
   chunk: FileChunk,
   extraFiles: SourceFile[] = [],
-  options: { windows?: ReturnType<typeof lineWindows> } = {},
+  options: { windows?: ReturnType<typeof lineWindows>; mode?: "triage" | "locate" } = {},
 ): EntryType {
   const files = [...chunk.files, ...extraFiles];
+  const mode = options.mode ?? "triage";
   return {
     review_rules: REVIEW_RULES,
     chunk: {
       id: chunk.id,
-      files: files.map(taggedFileState),
+      files:
+        mode === "locate"
+          ? files.map((file) => ({ path: file.relativePath, role: file.role }))
+          : files.map((file) => taggedFileState(file, "triage")),
     },
     ...(options.windows
       ? {
-          windows: options.windows.slice(0, 80).map((window) => ({
+          windows: options.windows.slice(0, 40).map((window) => ({
             id: window.id,
             path: window.path,
             start: window.start,

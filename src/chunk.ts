@@ -1,4 +1,11 @@
 import path from "node:path";
+import {
+  compactCharCount,
+  DEFAULT_MAX_FILES_PER_CHUNK,
+  fileStateText,
+  interestingLocalLines,
+  lineHasSignal,
+} from "./compact";
 import type { FileChunk, LineWindow, SourceFile } from "./types";
 
 export const DEFAULT_MAX_CHUNK_CHARS = 8_000;
@@ -7,6 +14,7 @@ const WINDOW_LINES = 10;
 export function groupFiles(
   files: SourceFile[],
   maxChunkChars = DEFAULT_MAX_CHUNK_CHARS,
+  maxFiles = DEFAULT_MAX_FILES_PER_CHUNK,
 ): FileChunk[] {
   const byDir = new Map<string, SourceFile[]>();
   for (const file of files) {
@@ -19,7 +27,7 @@ export function groupFiles(
   const dirChunks: FileChunk[] = [];
   let index = 0;
   for (const [dir, dirFiles] of [...byDir.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    const pieces = splitOversized(dirFiles, maxChunkChars);
+    const pieces = splitOversized(dirFiles, maxChunkChars, maxFiles);
     for (const piece of pieces) {
       index += 1;
       dirChunks.push({
@@ -32,7 +40,7 @@ export function groupFiles(
     }
   }
 
-  return mergeSmallChunks(dirChunks, files, maxChunkChars);
+  return mergeSmallChunks(dirChunks, files, maxChunkChars, maxFiles);
 }
 
 export function sliceFile(file: SourceFile, maxChars: number): SourceFile[] {
@@ -113,15 +121,19 @@ export function splitForRetry(chunk: FileChunk): FileChunk[] {
   }));
 }
 
-function splitOversized(files: SourceFile[], maxChunkChars: number): SourceFile[][] {
+function splitOversized(
+  files: SourceFile[],
+  maxChunkChars: number,
+  maxFiles: number,
+): SourceFile[][] {
   const groups: SourceFile[][] = [];
   let current: SourceFile[] = [];
   let size = 0;
 
   for (const original of files) {
     for (const file of sliceFile(original, maxChunkChars)) {
-    const fileSize = file.content.length;
-    if (current.length > 0 && size + fileSize > maxChunkChars) {
+    const fileSize = compactCharCount(file);
+    if (current.length > 0 && (size + fileSize > maxChunkChars || current.length >= maxFiles)) {
       groups.push(current);
       current = [];
       size = 0;
@@ -149,6 +161,7 @@ function mergeSmallChunks(
   chunks: FileChunk[],
   allFiles: SourceFile[],
   maxChunkChars: number,
+  maxFiles: number,
 ): FileChunk[] {
   const merged: FileChunk[] = [];
   let pending: FileChunk | undefined;
@@ -161,7 +174,11 @@ function mergeSmallChunks(
     }
     const pendingSize = chunkChars(pending);
     const related = sameParent(pending, chunk);
-    if (related && pendingSize + chunkSize <= maxChunkChars) {
+    if (
+      related &&
+      pendingSize + chunkSize <= maxChunkChars &&
+      pending.files.length + chunk.files.length <= maxFiles
+    ) {
       pending = {
         id: pending.id,
         files: [...pending.files, ...chunk.files],
@@ -208,7 +225,7 @@ function siblingHints(chunk: FileChunk, allFiles: SourceFile[]): string[] {
 }
 
 function chunkChars(chunk: FileChunk): number {
-  return chunk.files.reduce((sum, file) => sum + file.content.length, 0);
+  return chunk.files.reduce((sum, file) => sum + compactCharCount(file), 0);
 }
 
 function unique(values: string[]): string[] {
@@ -256,15 +273,90 @@ export function excerpt(file: SourceFile, start: number, end: number, pad = 1): 
     .join("\n");
 }
 
-export function taggedFileState(file: SourceFile): {
+export function taggedFileState(
+  file: SourceFile,
+  mode: "triage" | "full" = "triage",
+): {
   path: string;
   role: string;
   text: string;
+  lines_shown: number;
+  lines_total: number;
 } {
-  const base = file.lineOffset ?? 0;
+  const text = fileStateText(file, mode);
   return {
     path: file.relativePath,
     role: file.role,
-    text: file.lines.map((line, index) => `${base + index + 1}| ${line}`).join("\n"),
+    text,
+    lines_shown: text ? text.split("\n").length : 0,
+    lines_total: file.lines.length,
   };
 }
+
+export function locateWindows(
+  files: SourceFile[],
+  windowLines = 8,
+  maxWindows = 36,
+): LineWindow[] {
+  const windows: LineWindow[] = [];
+  for (const file of files) {
+    const hits = interestingLocalLines(file);
+    if (hits.length === 0) {
+      const all = lineWindows([file], windowLines);
+      if (all.length === 0) {
+        continue;
+      }
+      windows.push(all[0]);
+      if (all.length > 2) {
+        windows.push(all[Math.floor(all.length / 2)]);
+      }
+      if (all.length > 1) {
+        windows.push(all[all.length - 1]);
+      }
+      continue;
+    }
+
+    const seen = new Set<number>();
+    for (const localLine of hits) {
+      const start = Math.floor((localLine - 1) / windowLines) * windowLines + 1;
+      if (seen.has(start)) {
+        continue;
+      }
+      seen.add(start);
+      const end = Math.min(file.lines.length, start + windowLines - 1);
+      windows.push(makeWindow(file, start, end));
+    }
+  }
+
+  if (windows.length <= maxWindows) {
+    return windows;
+  }
+
+  return windows
+    .map((window) => ({
+      window,
+      hits: window.text.split("\n").filter((line) => lineHasSignal(line.replace(/^\d+\|\s?/, ""))).length,
+    }))
+    .sort((a, b) => b.hits - a.hits || a.window.start - b.window.start)
+    .slice(0, maxWindows)
+    .map((item) => item.window)
+    .sort((a, b) => a.path.localeCompare(b.path) || a.start - b.start);
+}
+
+function makeWindow(file: SourceFile, start: number, end: number): LineWindow {
+  const base = file.lineOffset ?? 0;
+  const absStart = base + start;
+  const absEnd = base + end;
+  const text = file.lines
+    .slice(start - 1, end)
+    .map((line, offset) => `${absStart + offset}| ${line}`)
+    .join("\n");
+  return {
+    id: windowId(file.relativePath, absStart, absEnd),
+    path: file.relativePath,
+    start: absStart,
+    end: absEnd,
+    text,
+  };
+}
+

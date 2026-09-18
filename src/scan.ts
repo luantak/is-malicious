@@ -1,6 +1,6 @@
 import path from "node:path";
 import { listChecks, type SemanticCheck } from "./checks";
-import { DEFAULT_MAX_CHUNK_CHARS, excerpt, groupFiles, lineWindows, splitForRetry } from "./chunk";
+import { DEFAULT_MAX_CHUNK_CHARS, excerpt, groupFiles, locateWindows, splitForRetry } from "./chunk";
 import { discoverFiles } from "./discover";
 import { shouldEscalate } from "./escalate";
 import { isMaxTokensError } from "./tokens";
@@ -39,7 +39,6 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
   const discovered = await discoverFiles(root);
   const files = options.fileFilter ? discovered.filter(options.fileFilter) : discovered;
   const chunks = groupFiles(files, options.maxChunkChars ?? DEFAULT_MAX_CHUNK_CHARS);
-  const byPath = new Map(files.map((file) => [file.relativePath, file]));
 
   const findings: Finding[] = [];
   const categoryScores: ScanReport["categoryScores"] = [];
@@ -81,18 +80,16 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
 
       const decision = shouldEscalate(pass1.answers, checks, thresholds);
       let answers = pass1.answers;
-      let extraFiles: SourceFile[] = [];
       let pass: 1 | 2 = 1;
 
       if (decision.escalate) {
         escalated += 1;
-        extraFiles = neighborFiles(chunk.neighborPaths, byPath, chunk.files);
-        const located = locateFiles(chunk.files, extraFiles, pass1.answers);
-        const windows = lineWindows(located, 8).slice(0, 80);
+        const located = locateFiles(chunk.files, [], pass1.answers);
+        const windows = locateWindows(located, 8, 36);
         try {
           const pass2 = await ask.ask(
-            chunkState(chunk, extraFiles, { windows }),
-            buildPass2Questions(checks, [...chunk.files, ...extraFiles], windows),
+            chunkState(chunk, [], { windows, mode: "locate" }),
+            buildPass2Questions(checks, chunk.files, windows),
             options.model,
           );
           answers = pass2.answers;
@@ -121,7 +118,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
           answers,
           checks,
           chunkId: chunk.id,
-          files: [...chunk.files, ...extraFiles],
+          files: chunk.files,
           pass,
           thresholds,
         }),
@@ -189,26 +186,6 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
     findings,
     categoryScores,
   };
-}
-
-function neighborFiles(
-  neighborPaths: string[],
-  byPath: Map<string, SourceFile>,
-  already: SourceFile[],
-): SourceFile[] {
-  const seen = new Set(already.map((file) => file.relativePath));
-  const extras: SourceFile[] = [];
-  for (const relativePath of neighborPaths) {
-    if (seen.has(relativePath)) {
-      continue;
-    }
-    const file = byPath.get(relativePath);
-    if (file) {
-      extras.push(file);
-      seen.add(relativePath);
-    }
-  }
-  return extras.slice(0, 8);
 }
 
 function categoryScoresFrom(answers: JevAnswerMap, checks: SemanticCheck[]): CategoryScore[] {

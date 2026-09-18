@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { isBuildOutputPath, isLowValueConfig, isNamedNoiseConfig, isSkippedDirName } from "./compact";
 import { isVcsDir, listUnignoredPaths } from "./gitignore";
 import type { FileRole, SourceFile } from "./types";
 
@@ -159,7 +160,7 @@ export interface DiscoverOptions {
 }
 
 export function shouldSkipDir(name: string): boolean {
-  return isVcsDir(name);
+  return isVcsDir(name) || isSkippedDirName(name);
 }
 
 export function classifyFile(relativePath: string): FileRole | null {
@@ -178,6 +179,15 @@ export function classifyFile(relativePath: string): FileRole | null {
   }
 
   const parts = relativePath.split(path.sep).map((part) => part.toLowerCase());
+  if (parts.some((part) => isSkippedDirName(part)) || isBuildOutputPath(relativePath)) {
+    return null;
+  }
+  if (isNamedNoiseConfig(relativePath)) {
+    return null;
+  }
+  if (relativePath.toLowerCase().endsWith(".d.ts")) {
+    return null;
+  }
   if (
     parts.includes(".github") ||
     parts.includes(".gitlab") ||
@@ -246,6 +256,9 @@ export async function discoverFiles(root: string, options: DiscoverOptions = {})
     }
 
     const content = buffer.toString("utf8");
+    if (isLowValueConfig(relativePath, content)) {
+      continue;
+    }
     found.push({
       path: fullPath,
       relativePath,

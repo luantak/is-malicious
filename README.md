@@ -22,10 +22,10 @@ The prompts treat ordinary powerful behavior as fine. Reading your own API key, 
 
 ## How a scan runs
 
-1. Recurse from the given path. Honor `.gitignore` the way git does (`git ls-files --exclude-standard` when the tree is a repo). Still skip binaries, images, lockfiles, and generated min/bundles. If Jev returns `max_tokens_exceeded`, the scanner splits that chunk and retries.
-2. Group files that share a directory, splitting when a chunk would blow the character budget.
-3. First pass: one Jev request per chunk, every category asked together.
-4. Second pass only if a category is hot or near 0.5, or the overall risk score is high. That pass adds neighboring files and asks which line window and reason label fit.
+1. Recurse from the given path. Honor `.gitignore` the way git does (`git ls-files --exclude-standard` when the tree is a repo). Still skip binaries, images, lockfiles, generated min/bundles, `tsconfig`, compiled `dist`/`lib`/`build` output, and JSON that has no scripts or other signals. If Jev returns `max_tokens_exceeded`, the scanner splits that chunk and retries.
+2. Group files that share a directory, packing by the compact (triage) size so empty type files do not each get their own request.
+3. First pass: one Jev request per chunk, every category asked together. Large files are sent as a skim: imports, first/last lines, and any line that looks security-relevant. Small files, CI, build, and install scripts go in full.
+4. Second pass only if a category is hot or near 0.5, or the overall risk score is high. That pass sends only the hot file's interesting line windows and asks which window and reason label fit. It does not resend the whole tree.
 5. Print paths, line ranges, category, probability, confidence, and the reason label.
 6. Sum `usage.input_tokens` from every Jev response and print the billed input cost. Output tokens are free.
 
