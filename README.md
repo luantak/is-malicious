@@ -1,79 +1,153 @@
 # is-malicious
 
-A CLI that reads a repo the way a hostile-code reviewer would, then asks TypeSafe Jev whether the source, config, build, or CI looks covert, deceptive, or built to steal data.
+Scan a codebase for hidden, deceptive, or data-stealing behavior with TypeSafe Jev. The CLI sends source, configuration, build, and CI files to Jev for review, then points you to suspicious files and lines.
 
-It is a second opinion on a tree you have not read yet. It is not a verdict, and it is not permission to run the project.
+Use it as a second opinion before running unfamiliar code. A clean report is not proof that a project is safe.
 
-## What this is
+## Quick start
 
-- A **semantic** scan. Jev sees file text and answers typed questions (`noul`, `choice`, `score`). It does not grep for a malware signature list and stop there.
-- A **behavior** scan. The hostile questions are about theft, exfil, hidden network use, decode-and-run, backdoors, remote command, surveillance, sabotage, supply-chain swaps, security weakening, mining/proxying, lateral movement, anti-removal, covert fingerprinting, permission abuse, persistence, stealth, deception, and dirty CI. Ordinary powerful code (your own API key, a documented host, a worker, a normal deploy job) is supposed to score low.
-- A **disclosure** scan for telemetry. Usage analytics, crash reports, and feature-flag pings show up even when they are documented and not hostile. They print under Telemetry as `info`, not as a dropper. The process still exits 0 unless something else is high.
-- A **pointer**. Findings name a chunk, a file, a line range, a category, a probability, and a closed reason label. 
-
-The first pass sends each scanned file in full. Extra blank lines are collapsed. Files that do not fit the chunk budget are split and sent as consecutive slices, still with every line. A second pass runs only on hot or uncertain chunks and windows the file Jev pointed at.
-
-## What this is not
-
-- **Not antivirus.** It does not inspect binaries, disk images, or running processes. It will not catch a malicious `.so` or a signed installer.
-- **Not a CVE or lockfile audit.** It does not tell you that lodash is old. Use `npm audit`, OSV, or your normal dependency tools for that.
-- **Not a secret scanner.** It looks for code that *steals* secrets. It does not inventory keys you already committed. Use gitleaks or trufflehog for that.
-- **Not a sandbox.** A clean report does not make `npm install` or `curl | bash` safe. Install scripts and postinstall hooks can still fire.
-- **Not proof.** A high score means Jev thinks that span looks hostile. A low score means it did not see that in the text it was shown. Either can be wrong.
-- **Not complete.** It honors `.gitignore`, skips binaries, images, lockfiles, generated bundles, `tsconfig`, compiled `dist`/`lib`/`build` output, and boring JSON. Malice that lives only there will not be read.
-- **Not a substitute for reading the code you are about to run.**
-
-If you need to know whether a dependency has a known vuln, or whether a binary is malware, use the tool built for that. This one answers a narrower question: does this source tree look like it is trying to hide something.
-
-## What it checks
-
-These categories live in `src/checks/builtin.ts`. Add an object and register it. The scanner does not special-case them.
-
-- credential / secret theft
-- unexpected data exfiltration
-- hidden or suspicious network activity
-- dynamic code download / execution
-- permission abuse
-- persistence / background execution
-- stealth / obfuscation
-- deceptive behavior
-- suspicious build / CI behavior
-- telemetry / analytics (advisory: users should know it phones home, even when that is ordinary)
-- authentication bypass / hidden backdoor
-- remote command execution / command-and-control
-- surveillance / input and device capture
-- destructive behavior / sabotage
-- supply-chain manipulation
-- security weakening
-- resource abuse / cryptomining / proxying
-- lateral movement / propagation
-- anti-removal / self-protection
-- covert fingerprinting / excessive collection
-
-## How a scan runs
-
-1. Recurse from the given path. Honor `.gitignore` the way git does (`git ls-files --exclude-standard` when the tree is a repo). Skip the noise listed above. If Jev returns `max_tokens_exceeded`, the scanner splits that chunk and retries.
-2. Group files that share a directory, splitting when a chunk would blow the character budget.
-3. First pass: one Jev request per chunk, every category asked together.
-4. Second pass only if a category is hot or near 0.5, or the overall risk score is high.
-5. Print paths, line ranges, category, probability, confidence, and the reason label.
-6. Sum `usage.input_tokens` and print the billed input cost.
-
-Noul answers have no separate `confidence` field. The report uses `2 * |p - 0.5|` so a 0.91 yes and a 0.09 no both read as confident.
-
-## Install
+You need Node.js 20 or later and a TypeSafe API key.
 
 ```bash
-export TYPESAFE_API_KEY=...
+export TYPESAFE_API_KEY=your-api-key
 npx is-malicious /path/to/project
 ```
 
-Or install it once:
+Omit the path to scan the current directory. Scans send file contents to the TypeSafe API and use paid input tokens. The report includes token usage and a calculated input cost.
+
+To install the CLI globally:
 
 ```bash
 npm install -g is-malicious
 is-malicious /path/to/project
 ```
+
+## Usage
+
+```text
+is-malicious [path] [options]
+```
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `--json` | Print the full report as JSON | Off |
+| `--model <name>` | Choose a Jev model | `jev-latest` |
+| `--concurrency <n>` | Set the number of parallel chunk requests | `12` |
+| `--min-prob <n>` | Set the minimum category probability to report | `0.40` |
+| `--diff-from <ref>` | Scan only files changed since a Git ref | Scan all eligible files |
+| `-h`, `--help` | Show help | |
+
+For example, scan files changed since `origin/main`:
+
+```bash
+is-malicious . --diff-from origin/main
+```
+
+This scans the changed files, not just the changed lines, so you can review a PR without paying to rescan the whole project.
+
+## Reading the report
+
+Findings include a file, line range, category, probability, confidence, and a short reason label. Use these to decide which code to read first.
+
+Telemetry appears separately as `info`, including documented analytics, crash reports, and feature-flag pings. Telemetry alone does not cause a failing exit code.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | No high-severity findings. The report may still contain other findings. |
+| `1` | At least one high-severity finding. |
+| `2` | The command failed, for example because of an invalid flag or a scan error. |
+
+Both high and low scores can be wrong. Review the flagged code and the scan's coverage before deciding whether to run a project.
+
+## What it checks
+
+Jev reviews file contents for behavior and context. Ordinary credential use, documented services, and normal deployment jobs are intended to score low.
+
+The checks cover:
+
+| Area | Behaviors |
+| --- | --- |
+| Data theft and collection | Credential theft, unexpected data uploads, covert fingerprinting, excessive collection, and surveillance of input or devices |
+| Network and execution | Hidden network activity, downloading and running hidden code, remote commands, and command-and-control channels |
+| Access and persistence | Permission abuse, hidden startup or background processes, authentication bypasses, backdoors, and resistance to removal |
+| Concealment | Obfuscation, anti-analysis checks, impersonation, and other deceptive behavior |
+| System abuse | Destruction or sabotage, weakened security controls, cryptomining, unwanted proxying, and spreading to other machines |
+| Build and dependencies | Suspicious build or CI steps and supply-chain manipulation |
+| Telemetry | Usage analytics, diagnostics, crash reports, and feature-flag pings, reported as advisory findings |
+
+The check definitions live in [`src/checks/builtin.ts`](src/checks/builtin.ts). To add a check, add and register a definition. The scanner handles checks through the same interface.
+
+## Limits and coverage
+
+The scanner reads selected text files. It does not inspect binaries, disk images, installers, or running processes.
+
+It respects `.gitignore` and skips files such as:
+
+- Images, binaries, and lockfiles.
+- Generated bundles and compiled `dist`, `lib`, and `build` output.
+- TypeScript declarations, `tsconfig`, and JSON configuration that its filters exclude.
+- Files larger than 400,000 bytes and unsupported file types.
+
+Malicious behavior in skipped files will not appear in the scan.
+
+This tool also does not audit known dependency vulnerabilities or inventory committed secrets. Use a dependency auditor for known vulnerabilities and a secret scanner for exposed keys.
+
+It does not sandbox code. Install scripts and postinstall hooks can still run when you install a project, even after a clean report.
+
+## GitHub Actions
+
+1. Copy a workflow from [`examples/github-actions/`](examples/github-actions/) to `.github/workflows/is-malicious.yml`.
+2. Add a repository secret named `TYPESAFE_API_KEY`.
+3. Make the PR base available with `fetch-depth: 0` or an explicit fetch of the base branch.
+
+Choose the workflow that fits your needs:
+
+| Workflow | Behavior |
+| --- | --- |
+| [`scan-pr.yml`](examples/github-actions/scan-pr.yml) | Scan files changed against the PR base and fail on high-severity findings. |
+| [`scan-pr-comment.yml`](examples/github-actions/scan-pr-comment.yml) | Run the same scan and post or update a report comment. |
+
+Both use this command to scan the PR's changed files:
+
+```bash
+npx --yes is-malicious . --diff-from "origin/${{ github.base_ref }}"
+```
+
+Fork PRs do not receive the API secret by default. Do not switch to `pull_request_target` just to expose the key to a fork PR. Running untrusted PR code in that context can expose your secrets.
+
+## Agent skill
+
+[![skills.sh](https://skills.sh/b/luantak/is-malicious)](https://skills.sh/luantak/is-malicious)
+
+The agent skill instructs an agent to scan a repository after cloning it, or when asked whether it is safe. The scan should happen before installing dependencies or running the project.
+
+Install the skill for the current project:
+
+```bash
+npx skills add luantak/is-malicious
+```
+
+Or install it globally:
+
+```bash
+npx skills add -g luantak/is-malicious
+```
+
+The agent runs `npx is-malicious`, so `TYPESAFE_API_KEY` must be set in its environment. See the [skills CLI docs](https://www.skills.sh/docs) for listing, updating, and removing skills.
+
+## How a scan works
+
+1. Find eligible files under the requested path, respecting ignore rules and file filters.
+2. Group files by directory into chunks that fit the character budget. Split larger files into consecutive slices.
+3. Send each chunk to Jev with all check categories in one request. The first pass includes the full contents of each selected file, with extra blank lines collapsed.
+4. Run a second pass on suspicious or uncertain chunks, or chunks with a high overall risk score. This pass focuses on line windows in the file Jev identified.
+5. Print findings, token usage, and the calculated input cost.
+
+If Jev returns `max_tokens_exceeded`, the scanner splits the chunk and retries.
+
+Jev answers typed questions using `noul`, `choice`, and `score`. Noul answers have no separate confidence field, so the report calculates confidence as `2 * |p - 0.5|`. Probabilities of `0.91` and `0.09` therefore have the same confidence, though they point to opposite answers.
+
+## Development
 
 From a checkout:
 
@@ -83,63 +157,10 @@ npm run build
 npx tsx src/cli.ts /path/to/project
 ```
 
-```
-is-malicious [path] [--json] [--model jev-latest] [--concurrency 12] [--min-prob 0.40] [--diff-from origin/main]
-```
-
-`--diff-from` only reads files `git diff` reports since that ref. Use it on PRs so you are not paying to rescan the whole tree.
-
-Exit code 1 means at least one high finding. Exit 0 means none of the findings cleared the high bar. Telemetry and uncertain hits can still be in the report.
-
-## GitHub Actions
-
-Copy a workflow from `examples/github-actions/` into `.github/workflows/is-malicious.yml`.
-
-Add a repo secret named `TYPESAFE_API_KEY`.
-
-`scan-pr.yml` scans the files changed against the PR base and fails the check on a high finding. `scan-pr-comment.yml` does the same and posts or updates a report comment.
-
-Fork PRs do not get that secret unless you change the default GitHub settings. Do not switch the workflow to `pull_request_target` just to get a key. That runs untrusted workflow files with your secrets.
-
-To scan only the PR:
-
-```yaml
-npx --yes is-malicious . --diff-from "origin/${{ github.base_ref }}"
-```
-
-Checkout needs `fetch-depth: 0` (or a fetch of the base branch) so the merge-base exists.
-
-## Agent skill
-
-[![skills.sh](https://skills.sh/b/luantak/is-malicious)](https://skills.sh/luantak/is-malicious)
-
-After a `git clone`, or when someone asks whether a tree is safe, the agent should run this CLI **before** `npm install`, `pip install`, or running the project.
-
-Install it with the [skills CLI](https://www.skills.sh/docs):
-
-```bash
-npx skills add luantak/is-malicious
-```
-
-Global, for every project:
-
-```bash
-npx skills add -g luantak/is-malicious
-```
-
-The agent then calls `npx is-malicious`. You still need `TYPESAFE_API_KEY` in the environment.
-
-See [skills.sh/docs](https://www.skills.sh/docs) for list, update, and remove.
-
-## Tests
+Run the tests:
 
 ```bash
 npm test
 ```
 
-The suite uses two fixtures under `fixtures/`:
-
-- `benign-notes` — local notes CLI and a normal GitHub Actions job
-- `suspicious-dropper` — remote `eval`, env/SSH theft, and a CI job that posts secrets
-
-Those scans use a scripted Jev client so `npm test` spends no API credits.
+Scan tests use a scripted Jev client, so they spend no API credits. Fixtures under [`fixtures/`](fixtures/) cover benign code, suspicious behavior such as remote `eval` and secret theft, and telemetry.
