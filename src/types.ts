@@ -107,6 +107,7 @@ export interface ScanOptions {
   concurrency?: number;
   maxChunkChars?: number;
   fileFilter?: (file: SourceFile) => boolean;
+  diffFrom?: string;
   onProgress?: (progress: ScanProgress) => void;
   ask?: import("./jev").JevAsker;
 }

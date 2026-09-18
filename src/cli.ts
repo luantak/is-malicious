@@ -11,6 +11,7 @@ interface CliArgs {
   model?: string;
   concurrency?: number;
   minProb?: number;
+  diffFrom?: string;
   help: boolean;
 }
 
@@ -30,6 +31,8 @@ function parseArgs(argv: string[]): CliArgs {
       args.concurrency = Number(argv[++i]);
     } else if (token === "--min-prob") {
       args.minProb = Number(argv[++i]);
+    } else if (token === "--diff-from") {
+      args.diffFrom = argv[++i];
     } else if (token.startsWith("-")) {
       throw new Error(`Unknown flag: ${token}`);
     } else {
@@ -52,6 +55,7 @@ function usage(): string {
     "  --model <name>      Jev model (default: jev-latest)",
     `  --concurrency <n>   Parallel chunk requests (default: ${DEFAULT_CONCURRENCY})`,
     "  --min-prob <n>      Minimum category probability to report (default: 0.40)",
+    "  --diff-from <ref>   Only scan files changed since a git ref (for example origin/main)",
     "  -h, --help          Show this help",
     "",
     "Set TYPESAFE_API_KEY in the environment.",
@@ -81,9 +85,15 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     root: args.root,
     model: args.model,
     concurrency,
+    diffFrom: args.diffFrom,
     thresholds: args.minProb === undefined ? undefined : { reportProbability: args.minProb },
     onProgress: args.json ? undefined : createProgressRenderer(process.stderr),
   });
+
+  if (args.diffFrom && report.filesScanned === 0) {
+    process.stderr.write(`No scannable files changed since ${args.diffFrom}.\n`);
+    return 0;
+  }
 
   process.stdout.write(
     args.json ? reportToJson(report) : formatReport(report, { color: shouldColor(process.stdout) }),

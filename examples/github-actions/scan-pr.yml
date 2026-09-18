@@ -1,0 +1,36 @@
+# Copy to .github/workflows/is-malicious.yml
+#
+# Repo secret: TYPESAFE_API_KEY
+# Fails the PR check when a finding is high. Telemetry-only stays green.
+
+name: is-malicious
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: is-malicious-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Scan files changed in this PR
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+        run: npx --yes is-malicious . --diff-from "origin/${{ github.base_ref }}"

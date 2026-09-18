@@ -1,6 +1,7 @@
 import path from "node:path";
 import { listChecks, type SemanticCheck } from "./checks";
 import { DEFAULT_MAX_CHUNK_CHARS, excerpt, groupFiles, locateWindows, splitForRetry } from "./chunk";
+import { listChangedPaths, pathFilter } from "./diff";
 import { discoverFiles } from "./discover";
 import { shouldEscalate } from "./escalate";
 import { isMaxTokensError } from "./tokens";
@@ -37,7 +38,12 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
   const thresholds = { ...DEFAULT_THRESHOLDS, ...options.thresholds };
   const ask = options.ask ?? createJevAsker({ apiKey: options.apiKey });
   const discovered = await discoverFiles(root);
-  const files = options.fileFilter ? discovered.filter(options.fileFilter) : discovered;
+  let files = options.fileFilter ? discovered.filter(options.fileFilter) : discovered;
+  if (options.diffFrom) {
+    const changed = await listChangedPaths(root, options.diffFrom);
+    const allowed = pathFilter(changed);
+    files = files.filter((file) => allowed(file.relativePath));
+  }
   const chunks = groupFiles(files, options.maxChunkChars ?? DEFAULT_MAX_CHUNK_CHARS);
 
   const findings: Finding[] = [];

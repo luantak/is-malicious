@@ -1,0 +1,65 @@
+# Copy to .github/workflows/is-malicious.yml
+#
+# Repo secret: TYPESAFE_API_KEY
+# Posts the report on the PR, then fails the check if a finding is high.
+
+name: is-malicious
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: is-malicious-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Scan files changed in this PR
+        id: scan
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+        run: |
+          set +e
+          npx --yes is-malicious . --diff-from "origin/${{ github.base_ref }}" | tee is-malicious-report.txt
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Comment report on the PR
+        if: always() && hashFiles('is-malicious-report.txt') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "<!-- is-malicious-report -->"
+            echo "## is-malicious"
+            echo
+            echo '```'
+            cat is-malicious-report.txt
+            echo '```'
+          } > comment.md
+          existing="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" --jq '.[] | select(.body | contains("<!-- is-malicious-report -->")) | .id' | head -n 1)"
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" -f body="$(cat comment.md)"
+          else
+            gh pr comment "${{ github.event.pull_request.number }}" --body-file comment.md
+          fi
+
+      - name: Fail on high findings
+        if: steps.scan.outputs.code == '1'
+        run: exit 1

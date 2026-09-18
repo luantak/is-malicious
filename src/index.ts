@@ -1,6 +1,7 @@
 export { scanProject, createAsker } from "./scan";
 export { discoverFiles, classifyFile, shouldSkipDir } from "./discover";
 export { listUnignoredPaths } from "./gitignore";
+export { listChangedPaths } from "./diff";
 export { groupFiles, lineWindows, locateWindows } from "./chunk";
 export { formatReport, findingPointer, reportToJson } from "./report";
 export { shouldEscalate } from "./escalate";

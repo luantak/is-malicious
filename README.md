@@ -85,10 +85,30 @@ npx tsx src/cli.ts /path/to/project
 ```
 
 ```
-is-malicious [path] [--json] [--model jev-latest] [--concurrency 12] [--min-prob 0.40]
+is-malicious [path] [--json] [--model jev-latest] [--concurrency 12] [--min-prob 0.40] [--diff-from origin/main]
 ```
 
+`--diff-from` only reads files `git diff` reports since that ref. Use it on PRs so you are not paying to rescan the whole tree.
+
 Exit code 1 means at least one high finding. Exit 0 means none of the findings cleared the high bar. Telemetry and uncertain hits can still be in the report.
+
+## GitHub Actions
+
+Copy a workflow from `examples/github-actions/` into `.github/workflows/is-malicious.yml`.
+
+Add a repo secret named `TYPESAFE_API_KEY`.
+
+`scan-pr.yml` scans the files changed against the PR base and fails the check on a high finding. `scan-pr-comment.yml` does the same and posts or updates a report comment.
+
+Fork PRs do not get that secret unless you change the default GitHub settings. Do not switch the workflow to `pull_request_target` just to get a key. That runs untrusted workflow files with your secrets.
+
+To scan only the PR:
+
+```yaml
+npx --yes is-malicious . --diff-from "origin/${{ github.base_ref }}"
+```
+
+Checkout needs `fetch-depth: 0` (or a fetch of the base branch) so the merge-base exists.
 
 ## Agent skill
 
