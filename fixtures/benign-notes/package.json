@@ -1,0 +1,6 @@
+{
+  "name": "benign-notes",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local notes helper used as a clean scanner fixture"
+}
