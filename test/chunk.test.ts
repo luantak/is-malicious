@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupFiles, lineWindows } from "../src/chunk";
+import { groupFiles, lineWindows, sliceFile, splitForRetry } from "../src/chunk";
 import type { SourceFile } from "../src/types";
 
 function file(relativePath: string, content: string, role: SourceFile["role"] = "source"): SourceFile {
@@ -41,5 +41,22 @@ describe("groupFiles", () => {
     expect(windows).toHaveLength(2);
     expect(windows[0]).toMatchObject({ path: "src/a.js", start: 1, end: 2, id: "src/a.js:1-2" });
     expect(windows[0].text).toContain("1| one");
+  });
+
+  it("splits a huge single line instead of sending it whole", () => {
+    const slices = sliceFile(file("src/blob.go", "x".repeat(50)), 20);
+    expect(slices.length).toBeGreaterThan(1);
+    expect(slices.every((slice) => slice.content.length <= 20)).toBe(true);
+  });
+
+  it("splits a failed chunk into smaller pieces", () => {
+    const chunk = {
+      id: "chunk-001",
+      files: [file("src/a.go", "aaaa"), file("src/b.go", "bbbb")],
+      neighborPaths: [],
+    };
+    const pieces = splitForRetry(chunk);
+    expect(pieces).toHaveLength(2);
+    expect(pieces[0].files).toHaveLength(1);
   });
 });

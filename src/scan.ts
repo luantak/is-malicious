@@ -1,8 +1,9 @@
 import path from "node:path";
 import { listChecks, type SemanticCheck } from "./checks";
-import { DEFAULT_MAX_CHUNK_CHARS, excerpt, groupFiles, lineWindows } from "./chunk";
+import { DEFAULT_MAX_CHUNK_CHARS, excerpt, groupFiles, lineWindows, splitForRetry } from "./chunk";
 import { discoverFiles } from "./discover";
 import { shouldEscalate } from "./escalate";
+import { isMaxTokensError } from "./tokens";
 import {
   buildPass1Questions,
   buildPass2Questions,
@@ -19,6 +20,7 @@ import {
   INPUT_PRICE_PER_MTOK,
   billedUsd,
   type CategoryScore,
+  type FileChunk,
   type Finding,
   type ScanOptions,
   type ScanReport,
@@ -38,22 +40,17 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
 
   const findings: Finding[] = [];
   const categoryScores: ScanReport["categoryScores"] = [];
+  const skipped: ScanReport["skipped"] = [];
   let escalated = 0;
   let model = options.model ?? "jev-latest";
   let requests = 0;
   let inputTokens = 0;
   let outputTokens = 0;
 
-  const workers = Math.max(1, options.concurrency ?? 2);
-  let next = 0;
+  process.stderr.write(`Scanning ${files.length} files as ${chunks.length} chunks\n`);
 
-  async function worker(): Promise<void> {
-    while (next < chunks.length) {
-      const index = next;
-      next += 1;
-      const chunk = chunks[index];
-      process.stderr.write(`chunk ${index + 1}/${chunks.length} ${chunk.id} (${chunk.files.length} files)\n`);
-      try {
+  async function evaluateChunk(chunk: FileChunk, depth = 0): Promise<void> {
+    try {
       const pass1 = await ask.ask(chunkState(chunk), buildPass1Questions(checks), options.model);
       model = pass1.model;
       requests += 1;
@@ -68,18 +65,25 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
       if (decision.escalate) {
         escalated += 1;
         extraFiles = neighborFiles(chunk.neighborPaths, byPath, chunk.files);
-        const windows = lineWindows([...chunk.files, ...extraFiles], 20).slice(0, 80);
-        const pass2 = await ask.ask(
-          chunkState(chunk, extraFiles, { windows: true }),
-          buildPass2Questions(checks, windows),
-          options.model,
-        );
-        answers = pass2.answers;
-        model = pass2.model;
-        requests += 1;
-        inputTokens += pass2.usage.inputTokens;
-        outputTokens += pass2.usage.outputTokens;
-        pass = 2;
+        try {
+          const windows = lineWindows([...chunk.files, ...extraFiles], 20).slice(0, 80);
+          const pass2 = await ask.ask(
+            chunkState(chunk, extraFiles, { windows: true }),
+            buildPass2Questions(checks, windows),
+            options.model,
+          );
+          answers = pass2.answers;
+          model = pass2.model;
+          requests += 1;
+          inputTokens += pass2.usage.inputTokens;
+          outputTokens += pass2.usage.outputTokens;
+          pass = 2;
+        } catch (error) {
+          if (!isMaxTokensError(error)) {
+            throw error;
+          }
+          process.stderr.write(`Keeping first-pass answers for ${chunk.id}; second pass exceeded tokens\n`);
+        }
       }
 
       const scores = categoryScoresFrom(answers, checks);
@@ -99,10 +103,35 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
           thresholds,
         }),
       );
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        process.stderr.write(`Skipping ${chunk.id}: ${message}\n`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const pieces = isMaxTokensError(error) && depth < 6 ? splitForRetry(chunk) : [];
+      if (pieces.length > 1) {
+        process.stderr.write(`Splitting ${chunk.id} after max_tokens into ${pieces.length} pieces\n`);
+        for (const piece of pieces) {
+          await evaluateChunk(piece, depth + 1);
+        }
+        return;
       }
+      process.stderr.write(`Skipping ${chunk.id}: ${message}\n`);
+      skipped.push({
+        chunkId: chunk.id,
+        files: chunk.files.map((file) => file.relativePath),
+        error: message,
+      });
+    }
+  }
+
+  const workers = Math.max(1, options.concurrency ?? 2);
+  let next = 0;
+
+  async function worker(): Promise<void> {
+    while (next < chunks.length) {
+      const index = next;
+      next += 1;
+      const chunk = chunks[index];
+      process.stderr.write(`chunk ${index + 1}/${chunks.length} ${chunk.id} (${chunk.files.length} files)\n`);
+      await evaluateChunk(chunk);
     }
   }
 
@@ -114,6 +143,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
     filesScanned: files.length,
     chunks: chunks.length,
     escalated,
+    skipped,
     model,
     usage: {
       requests,

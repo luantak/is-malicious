@@ -63,6 +63,7 @@ export interface ScanReport {
   filesScanned: number;
   chunks: number;
   escalated: number;
+  skipped: Array<{ chunkId: string; files: string[]; error: string }>;
   model: string;
   usage: ScanUsage;
   findings: Finding[];

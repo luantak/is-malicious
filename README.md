@@ -22,7 +22,7 @@ The prompts treat ordinary powerful behavior as fine. Reading your own API key, 
 
 ## How a scan runs
 
-1. Recurse from the given path. Skip binaries, images, lockfiles, generated bundles, and vendored trees such as `node_modules` / `vendor` / `dist`.
+1. Recurse from the given path. Honor `.gitignore` the way git does (`git ls-files --exclude-standard` when the tree is a repo). Still skip binaries, images, lockfiles, and generated min/bundles. If Jev returns `max_tokens_exceeded`, the scanner splits that chunk and retries.
 2. Group files that share a directory, splitting when a chunk would blow the character budget.
 3. First pass: one Jev request per chunk, every category asked together.
 4. Second pass only if a category is hot or near 0.5, or the overall risk score is high. That pass adds neighboring files and asks which line window and reason label fit.

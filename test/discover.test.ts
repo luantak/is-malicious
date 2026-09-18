@@ -6,18 +6,19 @@ const benign = path.join(__dirname, "../fixtures/benign-notes");
 const suspicious = path.join(__dirname, "../fixtures/suspicious-dropper");
 
 describe("discover", () => {
-  it("skips vendored, generated, lock, and image paths", () => {
-    expect(shouldSkipDir("node_modules")).toBe(true);
-    expect(shouldSkipDir("dist")).toBe(true);
+  it("skips lockfiles, images, and generated names by type", () => {
+    expect(shouldSkipDir(".git")).toBe(true);
+    expect(shouldSkipDir("node_modules")).toBe(false);
     expect(classifyFile("package-lock.json")).toBeNull();
     expect(classifyFile("logo.png")).toBeNull();
     expect(classifyFile("app.min.js")).toBeNull();
     expect(classifyFile("src/index.js")).toBe("source");
     expect(classifyFile(".github/workflows/ci.yml")).toBe("ci");
     expect(classifyFile("package.json")).toBe("config");
+    expect(classifyFile("testdata/ignore-me.js")).toBe("source");
   });
 
-  it("reads the benign fixture and ignores junk", async () => {
+  it("reads the benign fixture and honors its gitignore", async () => {
     const files = await discoverFiles(benign);
     const relative = files.map((file) => file.relativePath).sort();
     expect(relative).toEqual([
@@ -30,6 +31,7 @@ describe("discover", () => {
     expect(relative).not.toContain("package-lock.json");
     expect(relative).not.toContain("logo.png");
     expect(relative).not.toContain("dist/bundle.js");
+    expect(relative).not.toContain("testdata/ignore-me.js");
   });
 
   it("reads the suspicious fixture source and CI", async () => {

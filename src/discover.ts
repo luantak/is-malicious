@@ -1,35 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { isVcsDir, listUnignoredPaths } from "./gitignore";
 import type { FileRole, SourceFile } from "./types";
-
-const SKIP_DIRS = new Set([
-  ".git",
-  ".hg",
-  ".svn",
-  ".idea",
-  ".vscode",
-  ".next",
-  ".nuxt",
-  ".turbo",
-  ".cache",
-  ".gradle",
-  ".tox",
-  ".venv",
-  "venv",
-  "node_modules",
-  "vendor",
-  "third_party",
-  "third-party",
-  "dist",
-  "build",
-  "out",
-  "coverage",
-  "target",
-  "__pycache__",
-  "Pods",
-  "Carthage",
-  "generated",
-]);
 
 const SKIP_FILES = new Set([
   "package-lock.json",
@@ -187,7 +159,7 @@ export interface DiscoverOptions {
 }
 
 export function shouldSkipDir(name: string): boolean {
-  return SKIP_DIRS.has(name);
+  return isVcsDir(name);
 }
 
 export function classifyFile(relativePath: string): FileRole | null {
@@ -244,71 +216,46 @@ function looksBinary(buffer: Buffer): boolean {
 export async function discoverFiles(root: string, options: DiscoverOptions = {}): Promise<SourceFile[]> {
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
   const absRoot = path.resolve(root);
+  const candidates = await listUnignoredPaths(absRoot);
   const found: SourceFile[] = [];
 
-  async function walk(dir: string): Promise<void> {
-    let entries;
+  for (const relativePath of candidates) {
+    const role = classifyFile(relativePath);
+    if (!role) {
+      continue;
+    }
+    const fullPath = path.join(absRoot, relativePath);
+    let stat;
     try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
+      stat = await fs.stat(fullPath);
     } catch {
-      return;
+      continue;
+    }
+    if (!stat.isFile() || stat.size > maxBytes) {
+      continue;
     }
 
-    for (const entry of entries) {
-      if (entry.name.startsWith(".") && entry.isDirectory() && shouldSkipDir(entry.name)) {
-        continue;
-      }
-      if (entry.isDirectory()) {
-        if (shouldSkipDir(entry.name)) {
-          continue;
-        }
-        await walk(path.join(dir, entry.name));
-        continue;
-      }
-      if (!entry.isFile()) {
-        continue;
-      }
-
-      const fullPath = path.join(dir, entry.name);
-      const relativePath = path.relative(absRoot, fullPath);
-      const role = classifyFile(relativePath);
-      if (!role) {
-        continue;
-      }
-
-      let stat;
-      try {
-        stat = await fs.stat(fullPath);
-      } catch {
-        continue;
-      }
-      if (stat.size > maxBytes) {
-        continue;
-      }
-
-      let buffer: Buffer;
-      try {
-        buffer = await fs.readFile(fullPath);
-      } catch {
-        continue;
-      }
-      if (looksBinary(buffer)) {
-        continue;
-      }
-
-      const content = buffer.toString("utf8");
-      found.push({
-        path: fullPath,
-        relativePath,
-        role,
-        content,
-        lines: content.split(/\r?\n/),
-        bytes: stat.size,
-      });
+    let buffer: Buffer;
+    try {
+      buffer = await fs.readFile(fullPath);
+    } catch {
+      continue;
     }
+    if (looksBinary(buffer)) {
+      continue;
+    }
+
+    const content = buffer.toString("utf8");
+    found.push({
+      path: fullPath,
+      relativePath,
+      role,
+      content,
+      lines: content.split(/\r?\n/),
+      bytes: stat.size,
+    });
   }
 
-  await walk(absRoot);
   found.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
   return found;
 }

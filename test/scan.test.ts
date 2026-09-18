@@ -1,6 +1,7 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { scanProject } from "../src/scan";
+import type { JevResult } from "../src/jev";
 import { choiceAnswer, highAnswers, lowAnswers, scriptedAsker, stateText } from "./helpers";
 
 const benign = path.join(__dirname, "../fixtures/benign-notes");
@@ -53,5 +54,22 @@ describe("scanProject", () => {
     );
     expect(report.findings.some((finding) => finding.reason.includes("environment"))).toBe(true);
     expect(report.findings.every((finding) => finding.pass === 2)).toBe(true);
+  });
+
+  it("retries a max_tokens error by splitting the chunk", async () => {
+    let calls = 0;
+    const ask = {
+      async ask(state: unknown): Promise<JevResult> {
+        calls += 1;
+        const paths = JSON.stringify(state).match(/"path":/g)?.length ?? 0;
+        if (paths >= 3) {
+          throw new Error('400 {"detail":{"error_type":"max_tokens_exceeded"}}');
+        }
+        return { model: "jev-test", answers: lowAnswers(), usage: { inputTokens: 10, outputTokens: 1 } };
+      },
+    };
+    const report = await scanProject({ root: suspicious, ask, concurrency: 1 });
+    expect(calls).toBeGreaterThan(report.chunks);
+    expect(report.skipped).toEqual([]);
   });
 });

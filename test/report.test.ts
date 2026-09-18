@@ -9,6 +9,7 @@ describe("formatReport", () => {
       filesScanned: 3,
       chunks: 1,
       escalated: 1,
+      skipped: [],
       model: "jev-test",
       usage: {
         requests: 2,
@@ -58,6 +59,7 @@ describe("formatReport", () => {
         filesScanned: 2,
         chunks: 1,
         escalated: 0,
+        skipped: [],
         model: "jev-test",
         usage: {
           requests: 1,

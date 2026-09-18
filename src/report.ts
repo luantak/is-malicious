@@ -3,10 +3,18 @@ import type { Finding, ScanReport } from "./types";
 export function formatReport(report: ScanReport): string {
   const lines = [
     `Scan: ${report.root}`,
-    `Files ${report.filesScanned}  chunks ${report.chunks}  escalated ${report.escalated}  model ${report.model}`,
+    `Files ${report.filesScanned}  chunks ${report.chunks}  escalated ${report.escalated}  skipped ${report.skipped.length}  model ${report.model}`,
     formatUsage(report),
     "",
   ];
+
+  if (report.skipped.length > 0) {
+    lines.push("Skipped chunks");
+    for (const item of report.skipped) {
+      lines.push(`  ${item.chunkId}  ${item.files.join(", ")}  ${item.error}`);
+    }
+    lines.push("");
+  }
 
   if (report.findings.length === 0) {
     lines.push("No findings above the report threshold.");

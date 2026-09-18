@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { FileChunk, LineWindow, SourceFile } from "./types";
 
-export const DEFAULT_MAX_CHUNK_CHARS = 18_000;
+export const DEFAULT_MAX_CHUNK_CHARS = 8_000;
 const WINDOW_LINES = 10;
 
 export function groupFiles(
@@ -42,15 +42,38 @@ export function sliceFile(file: SourceFile, maxChars: number): SourceFile[] {
   const slices: SourceFile[] = [];
   let index = 0;
   while (index < file.lines.length) {
+    const line = file.lines[index];
+    if (line.length > maxChars) {
+      for (let offset = 0; offset < line.length; offset += maxChars) {
+        const piece = line.slice(offset, offset + maxChars);
+        slices.push({
+          ...file,
+          content: piece,
+          lines: [piece],
+          bytes: piece.length,
+          lineOffset: (file.lineOffset ?? 0) + index,
+        });
+      }
+      index += 1;
+      continue;
+    }
+
     let end = index;
     let size = 0;
     while (end < file.lines.length) {
       const add = file.lines[end].length + 1;
+      if (file.lines[end].length > maxChars) {
+        break;
+      }
       if (end > index && size + add > maxChars) {
         break;
       }
       size += add;
       end += 1;
+    }
+    if (end === index) {
+      end = index + 1;
+      size = file.lines[index].length;
     }
     const lines = file.lines.slice(index, end);
     slices.push({
@@ -63,6 +86,31 @@ export function sliceFile(file: SourceFile, maxChars: number): SourceFile[] {
     index = end;
   }
   return slices;
+}
+
+export function splitForRetry(chunk: FileChunk): FileChunk[] {
+  if (chunk.files.length > 1) {
+    const mid = Math.ceil(chunk.files.length / 2);
+    return [
+      { ...chunk, id: `${chunk.id}a`, files: chunk.files.slice(0, mid), neighborPaths: [] },
+      { ...chunk, id: `${chunk.id}b`, files: chunk.files.slice(mid), neighborPaths: [] },
+    ];
+  }
+  const file = chunk.files[0];
+  if (!file) {
+    return [];
+  }
+  const target = Math.max(1_500, Math.floor(file.content.length / 2));
+  const slices = sliceFile(file, target);
+  if (slices.length <= 1) {
+    return [];
+  }
+  return slices.map((slice, index) => ({
+    ...chunk,
+    id: `${chunk.id}.${index + 1}`,
+    files: [slice],
+    neighborPaths: [],
+  }));
 }
 
 function splitOversized(files: SourceFile[], maxChunkChars: number): SourceFile[][] {
