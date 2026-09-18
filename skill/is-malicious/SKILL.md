@@ -41,6 +41,7 @@ Do not pass `--json` unless the user asked for machine output.
 
 - Quote the CLI output. Keep chunk ids, `path:start-end`, category, probability, and reason. Do not rewrite findings into a vibe.
 - High findings: stop. Do not install or run the project unless the user explicitly overrides.
+- Telemetry / `info`: show the host and the lines. Say it is not a malice finding. Users still need to know the project phones home.
 - Uncertain / medium only: show them and say they are not a clean bill of health.
 - No findings: say Jev did not flag the files it read. That is not a guarantee. Do not call the repo safe.
 - If the scan failed (no key, no CLI, API error): say so. Do not invent a result.

@@ -1,0 +1,6 @@
+{
+  "name": "with-telemetry",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local notes helper that also sends usage events"
+}

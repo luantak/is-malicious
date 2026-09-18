@@ -222,11 +222,13 @@ function findingsFrom(input: {
     }
     const confidence = noulConfidence(probability);
     const severity =
-      probability >= thresholds.suspiciousProbability
-        ? "high"
-        : probability >= thresholds.uncertainHigh
-          ? "medium"
-          : "uncertain";
+      check.kind === "advisory"
+        ? "info"
+        : probability >= thresholds.suspiciousProbability
+          ? "high"
+          : probability >= thresholds.uncertainHigh
+            ? "medium"
+            : "uncertain";
 
     results.push({
       category: check.id,

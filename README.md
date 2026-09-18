@@ -7,7 +7,8 @@ It is a second opinion on a tree you have not read yet. It is not a verdict, and
 ## What this is
 
 - A **semantic** scan. Jev sees file text and answers typed questions (`noul`, `choice`, `score`). It does not grep for a malware signature list and stop there.
-- A **behavior** scan. The questions are about theft, exfil, hidden network use, decode-and-run, permission abuse, persistence, stealth, deception, and dirty CI. Ordinary powerful code (your own API key, a documented host, a worker, a normal deploy job) is supposed to score low.
+- A **behavior** scan. The hostile questions are about theft, exfil, hidden network use, decode-and-run, permission abuse, persistence, stealth, deception, and dirty CI. Ordinary powerful code (your own API key, a documented host, a worker, a normal deploy job) is supposed to score low.
+- A **disclosure** scan for telemetry. Usage analytics, crash reports, and feature-flag pings show up even when they are documented and not hostile. They print under Telemetry as `info`, not as a dropper. The process still exits 0 unless something else is high.
 - A **pointer**. Findings name a chunk, a file, a line range, a category, a probability, and a closed reason label. Jev does not write an essay.
 - A **paid API client**. Input tokens are billed. Output tokens are free. The report prints the actual bill.
 
@@ -38,6 +39,7 @@ These categories live in `src/checks/builtin.ts`. Add an object and register it.
 - stealth / obfuscation
 - deceptive behavior
 - suspicious build / CI behavior
+- telemetry / analytics (advisory: users should know it phones home, even when that is ordinary)
 
 ## How a scan runs
 
@@ -64,7 +66,7 @@ Or `npm run build` and `node dist/cli.js`.
 is-malicious [path] [--json] [--model jev-latest] [--concurrency 12] [--min-prob 0.40]
 ```
 
-Exit code 1 means at least one high finding. Exit 0 means none of the findings cleared the high bar. Uncertain hits can still be in the report.
+Exit code 1 means at least one high finding. Exit 0 means none of the findings cleared the high bar. Telemetry and uncertain hits can still be in the report.
 
 ## Agent skill
 

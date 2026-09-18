@@ -18,6 +18,7 @@ describe("check registry", () => {
       "stealth",
       "deception",
       "suspicious_ci",
+      "telemetry",
     ]);
   });
 

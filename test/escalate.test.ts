@@ -33,6 +33,13 @@ describe("shouldEscalate", () => {
     expect(decision.reason).toBe("uncertain");
   });
 
+  it("escalates documented telemetry as advisory, not suspicious", () => {
+    const decision = shouldEscalate(highAnswers({ telemetry: 0.88 }), builtinChecks, DEFAULT_THRESHOLDS);
+    expect(decision.escalate).toBe(true);
+    expect(decision.reason).toBe("advisory");
+    expect(decision.flagged).toEqual(["telemetry"]);
+  });
+
   it("escalates a high overall risk score", () => {
     const answers = lowAnswers();
     answers.overall_risk = scoreAnswer(1.8);

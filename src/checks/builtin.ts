@@ -145,4 +145,21 @@ export const builtinChecks: SemanticCheck[] = [
       none: "No suspicious build or CI behavior stands out.",
     },
   },
+  {
+    id: "telemetry",
+    label: "telemetry / analytics",
+    kind: "advisory",
+    instructions:
+      "Does `chunk.files` send usage events, diagnostics, crash reports, feature-flag pings, or analytics to a first-party or vendor host? Documented and ordinary telemetry still counts as yes. The product's own feature traffic (sync, model calls, search) does not.",
+    criteria: {
+      true: "The code phones home with usage, diagnostics, crashes, or analytics.",
+      false: "There is no telemetry, or outbound traffic is the product feature itself.",
+    },
+    reasons: {
+      usage_analytics: "Sends usage or product-analytics events off-box.",
+      crash_or_diagnostics: "Sends crash reports or diagnostic dumps to a collector.",
+      vendor_sdk: "Embeds a third-party analytics, error, or feature-flag SDK.",
+      none: "No telemetry stands out.",
+    },
+  },
 ];

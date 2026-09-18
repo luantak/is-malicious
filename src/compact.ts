@@ -21,6 +21,7 @@ const SIGNAL_PATTERNS: RegExp[] = [
   /\b(writeFile|writefilesync|createWriteStream|unlink|rmsync|rmtree|shutil)\b/i,
   /\b(secrets\.|NPM_TOKEN|AWS_SECRET|WEBHOOK|curl\s+[^\n]*\|\s*(ba)?sh)\b/i,
   /\b(password|passwd|login|sign[- ]?in|verify your|grant access|click allow|update now|credentials?)\b/i,
+  /\b(telemetry|analytics|sentry|posthog|segment|mixpanel|amplitude|crashlytics|datadog|feature[- ]?flag)\b/i,
   /\b(Runtime\.getRuntime|ProcessBuilder|exec\.Command|Command::new|Open3|Kernel\.system)\b/i,
   /\[\s*['"`](eval|exec|spawn|system|require)['"`]\s*\]/,
 ];

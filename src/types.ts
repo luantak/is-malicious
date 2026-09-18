@@ -36,7 +36,7 @@ export interface Finding {
   label: string;
   probability: number;
   confidence: number;
-  severity: "high" | "medium" | "uncertain";
+  severity: "high" | "medium" | "uncertain" | "info";
   files: string[];
   lines: Array<{ path: string; start: number; end: number; excerpt: string }>;
   reason: string;

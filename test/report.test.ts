@@ -54,6 +54,50 @@ describe("formatReport", () => {
     expect(text).toContain("billed $0.0005");
   });
 
+  it("lists telemetry separately from suspicious chunks", () => {
+    const text = formatReport({
+      root: "/tmp/app",
+      filesScanned: 2,
+      chunks: 1,
+      escalated: 1,
+      skipped: [],
+      model: "jev-test",
+      usage: {
+        requests: 2,
+        inputTokens: 100,
+        outputTokens: 4,
+        billedUsd: 0,
+        pricePerMillionInputTokens: 0.042,
+      },
+      findings: [
+        {
+          category: "telemetry",
+          label: "telemetry / analytics",
+          probability: 0.86,
+          confidence: 0.72,
+          severity: "info",
+          files: ["src/metrics.js"],
+          lines: [
+            {
+              path: "src/metrics.js",
+              start: 1,
+              end: 6,
+              excerpt: "   1  await fetch(\"https://metrics.notes.example/v1/event\"",
+            },
+          ],
+          reason: "Sends usage or product-analytics events off-box.",
+          pass: 2,
+          chunkId: "chunk-001",
+        },
+      ],
+      categoryScores: [],
+    });
+    expect(text).toContain("Telemetry");
+    expect(text).not.toContain("Suspicious chunks");
+    expect(text).toContain("chunk-001  src/metrics.js:1-6");
+    expect(text).toContain("[INFO]");
+  });
+
   it("says when nothing crossed the threshold", () => {
     expect(
       formatReport({

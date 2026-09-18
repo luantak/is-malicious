@@ -4,7 +4,7 @@ import type { ScanThresholds } from "./types";
 
 export interface EscalationDecision {
   escalate: boolean;
-  reason: "suspicious" | "uncertain" | "overall" | "none";
+  reason: "suspicious" | "advisory" | "uncertain" | "overall" | "none";
   flagged: string[];
 }
 
@@ -15,13 +15,18 @@ export function shouldEscalate(
 ): EscalationDecision {
   const flagged: string[] = [];
   let suspicious = false;
+  let advisory = false;
   let uncertain = false;
 
   for (const check of checks) {
     const probability = readNoul(answers, check.id);
     if (probability >= thresholds.suspiciousProbability) {
       flagged.push(check.id);
-      suspicious = true;
+      if (check.kind === "advisory") {
+        advisory = true;
+      } else {
+        suspicious = true;
+      }
       continue;
     }
     if (
@@ -37,6 +42,9 @@ export function shouldEscalate(
   const overall = readScore(answers, "overall_risk");
   if (suspicious) {
     return { escalate: true, reason: "suspicious", flagged };
+  }
+  if (advisory) {
+    return { escalate: true, reason: "advisory", flagged };
   }
   if (uncertain) {
     return { escalate: true, reason: "uncertain", flagged };

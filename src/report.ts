@@ -37,12 +37,26 @@ export function formatReport(report: ScanReport, options: FormatOptions = {}): s
     return `${lines.join("\n")}\n`;
   }
 
-  lines.push(color.bold("Suspicious chunks"));
-  for (const finding of uniqueChunkFindings(report.findings)) {
-    lines.push(`  ${findingPointer(finding)}`);
-    lines.push(color.dim(`    ${finding.severity}  ${finding.category}  p=${finding.probability.toFixed(2)}`));
+  const hostile = report.findings.filter((finding) => finding.severity !== "info");
+  const advisory = report.findings.filter((finding) => finding.severity === "info");
+
+  if (hostile.length > 0) {
+    lines.push(color.bold("Suspicious chunks"));
+    for (const finding of uniqueChunkFindings(hostile)) {
+      lines.push(`  ${findingPointer(finding)}`);
+      lines.push(color.dim(`    ${finding.severity}  ${finding.category}  p=${finding.probability.toFixed(2)}`));
+    }
+    lines.push("");
   }
-  lines.push("");
+
+  if (advisory.length > 0) {
+    lines.push(color.bold("Telemetry"));
+    for (const finding of uniqueChunkFindings(advisory)) {
+      lines.push(`  ${findingPointer(finding)}`);
+      lines.push(color.dim(`    ${finding.severity}  ${finding.category}  p=${finding.probability.toFixed(2)}`));
+    }
+    lines.push("");
+  }
 
   lines.push(color.bold(`Findings  ${report.findings.length}`));
   lines.push("");
@@ -89,6 +103,9 @@ function severityBadge(severity: Finding["severity"], color: Palette): string {
   }
   if (severity === "medium") {
     return color.yellow(label);
+  }
+  if (severity === "info") {
+    return color.cyan(label);
   }
   return color.dim(label);
 }
