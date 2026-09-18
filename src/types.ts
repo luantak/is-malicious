@@ -83,6 +83,21 @@ export interface ScanThresholds {
   escalateOverallScore: number;
 }
 
+export const DEFAULT_CONCURRENCY = 12;
+
+export interface ScanProgress {
+  files: number;
+  chunks: number;
+  done: number;
+  inflight: number;
+  findings: number;
+  escalated: number;
+  skipped: number;
+  requests: number;
+  current?: string;
+  note?: string;
+}
+
 export interface ScanOptions {
   root: string;
   apiKey?: string;
@@ -92,6 +107,7 @@ export interface ScanOptions {
   concurrency?: number;
   maxChunkChars?: number;
   fileFilter?: (file: SourceFile) => boolean;
+  onProgress?: (progress: ScanProgress) => void;
   ask?: import("./jev").JevAsker;
 }
 

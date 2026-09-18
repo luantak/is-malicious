@@ -14,9 +14,10 @@ export {
 } from "./checks";
 export type { SemanticCheck } from "./checks";
 export type { JevAsker, JevResult, JevAnswerMap, QuestionMap } from "./jev";
-export { billedUsd, INPUT_PRICE_PER_MTOK } from "./types";
+export { billedUsd, DEFAULT_CONCURRENCY, INPUT_PRICE_PER_MTOK } from "./types";
 export type {
   ScanOptions,
+  ScanProgress,
   ScanReport,
   ScanUsage,
   Finding,

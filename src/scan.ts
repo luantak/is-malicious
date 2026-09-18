@@ -16,6 +16,7 @@ import {
   type JevAsker,
 } from "./jev";
 import {
+  DEFAULT_CONCURRENCY,
   DEFAULT_THRESHOLDS,
   INPUT_PRICE_PER_MTOK,
   billedUsd,
@@ -23,6 +24,7 @@ import {
   type FileChunk,
   type Finding,
   type ScanOptions,
+  type ScanProgress,
   type ScanReport,
   type ScanThresholds,
   type SourceFile,
@@ -47,7 +49,26 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
   let inputTokens = 0;
   let outputTokens = 0;
 
-  process.stderr.write(`Scanning ${files.length} files as ${chunks.length} chunks\n`);
+  let done = 0;
+  let inflight = 0;
+
+  function emit(current?: string, note?: string): void {
+    const snapshot: ScanProgress = {
+      files: files.length,
+      chunks: chunks.length,
+      done,
+      inflight,
+      findings: findings.length,
+      escalated,
+      skipped: skipped.length,
+      requests,
+      current,
+      note,
+    };
+    options.onProgress?.(snapshot);
+  }
+
+  emit();
 
   async function evaluateChunk(chunk: FileChunk, depth = 0): Promise<void> {
     try {
@@ -82,7 +103,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
           if (!isMaxTokensError(error)) {
             throw error;
           }
-          process.stderr.write(`Keeping first-pass answers for ${chunk.id}; second pass exceeded tokens\n`);
+          emit(chunk.files[0]?.relativePath, `${chunk.id}: second pass exceeded tokens, keeping first pass`);
         }
       }
 
@@ -107,13 +128,13 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
       const message = error instanceof Error ? error.message : String(error);
       const pieces = isMaxTokensError(error) && depth < 6 ? splitForRetry(chunk) : [];
       if (pieces.length > 1) {
-        process.stderr.write(`Splitting ${chunk.id} after max_tokens into ${pieces.length} pieces\n`);
+        emit(chunk.files[0]?.relativePath, `${chunk.id}: split after max_tokens`);
         for (const piece of pieces) {
           await evaluateChunk(piece, depth + 1);
         }
         return;
       }
-      process.stderr.write(`Skipping ${chunk.id}: ${message}\n`);
+      emit(chunk.files[0]?.relativePath, `${chunk.id}: ${message}`);
       skipped.push({
         chunkId: chunk.id,
         files: chunk.files.map((file) => file.relativePath),
@@ -122,7 +143,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
     }
   }
 
-  const workers = Math.max(1, options.concurrency ?? 2);
+  const workers = Math.max(1, options.concurrency ?? DEFAULT_CONCURRENCY);
   let next = 0;
 
   async function worker(): Promise<void> {
@@ -130,12 +151,17 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
       const index = next;
       next += 1;
       const chunk = chunks[index];
-      process.stderr.write(`chunk ${index + 1}/${chunks.length} ${chunk.id} (${chunk.files.length} files)\n`);
+      inflight += 1;
+      emit(chunk.files[0]?.relativePath);
       await evaluateChunk(chunk);
+      inflight -= 1;
+      done += 1;
+      emit(chunk.files[0]?.relativePath);
     }
   }
 
   await Promise.all(Array.from({ length: Math.min(workers, chunks.length || 1) }, () => worker()));
+  emit();
   findings.sort((a, b) => b.probability - a.probability || a.category.localeCompare(b.category));
   categoryScores.sort((a, b) => a.chunkId.localeCompare(b.chunkId));
   return {

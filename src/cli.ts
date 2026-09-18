@@ -1,6 +1,9 @@
 #!/usr/bin/env node
+import { shouldColor } from "./color";
+import { createProgressRenderer } from "./progress";
 import { formatReport, reportToJson } from "./report";
 import { scanProject } from "./scan";
+import { DEFAULT_CONCURRENCY } from "./types";
 
 interface CliArgs {
   root: string;
@@ -47,7 +50,7 @@ function usage(): string {
     "Options:",
     "  --json              Print the full report as JSON",
     "  --model <name>      Jev model (default: jev-latest)",
-    "  --concurrency <n>   Parallel chunk requests (default: 2)",
+    `  --concurrency <n>   Parallel chunk requests (default: ${DEFAULT_CONCURRENCY})`,
     "  --min-prob <n>      Minimum category probability to report (default: 0.40)",
     "  -h, --help          Show this help",
     "",
@@ -69,14 +72,22 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return 0;
   }
 
+  const concurrency = args.concurrency ?? DEFAULT_CONCURRENCY;
+  if (!args.json) {
+    process.stderr.write(`Scanning ${args.root}  (${concurrency} at a time)\n`);
+  }
+
   const report = await scanProject({
     root: args.root,
     model: args.model,
-    concurrency: args.concurrency,
+    concurrency,
     thresholds: args.minProb === undefined ? undefined : { reportProbability: args.minProb },
+    onProgress: args.json ? undefined : createProgressRenderer(process.stderr),
   });
 
-  process.stdout.write(args.json ? reportToJson(report) : formatReport(report));
+  process.stdout.write(
+    args.json ? reportToJson(report) : formatReport(report, { color: shouldColor(process.stdout) }),
+  );
   return report.findings.some((finding) => finding.severity === "high") ? 1 : 0;
 }
 

@@ -42,7 +42,7 @@ npx tsx src/cli.ts /path/to/project
 Or `npm run build` and `node dist/cli.js`.
 
 ```
-is-malicious [path] [--json] [--model jev-latest] [--concurrency 2] [--min-prob 0.40]
+is-malicious [path] [--json] [--model jev-latest] [--concurrency 12] [--min-prob 0.40]
 ```
 
 Exit code 1 means at least one high finding.
