@@ -2,7 +2,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { scanProject } from "../src/scan";
 import type { JevResult } from "../src/jev";
-import { choiceAnswer, highAnswers, lowAnswers, scriptedAsker, stateText } from "./helpers";
+import { formatReport } from "../src/report";
+import { choiceAnswer, highAnswers, lowAnswers, pickWindowId, scriptedAsker, stateText } from "./helpers";
 
 const benign = path.join(__dirname, "../fixtures/benign-notes");
 const suspicious = path.join(__dirname, "../fixtures/suspicious-dropper");
@@ -23,20 +24,27 @@ describe("scanProject", () => {
     const ask = scriptedAsker((state) => {
       const text = stateText(state);
       const answers = highAnswers({
-        credential_theft: 0.93,
-        dynamic_code: 0.88,
-        data_exfiltration: 0.81,
-        suspicious_ci: text.includes("publish.yml") ? 0.9 : 0.2,
+        credential_theft: text.includes("src/sync.js") ? 0.93 : 0.04,
+        dynamic_code: text.includes("src/update.js") ? 0.88 : 0.04,
+        data_exfiltration: text.includes("src/sync.js") ? 0.81 : 0.04,
+        suspicious_ci: text.includes("publish.yml") ? 0.9 : 0.04,
       });
+      if (text.includes("src/sync.js")) {
+        answers.hot_file = choiceAnswer("src/sync.js", 0.9);
+      } else if (text.includes("publish.yml")) {
+        answers.hot_file = choiceAnswer(".github/workflows/publish.yml", 0.9);
+      } else if (text.includes("src/update.js")) {
+        answers.hot_file = choiceAnswer("src/update.js", 0.9);
+      }
       if (text.includes("windows")) {
         if (text.includes("src/sync.js")) {
-          answers.relevant_window = choiceAnswer("src/sync.js:1-10", 0.86);
+          answers.relevant_window = choiceAnswer(pickWindowId(state, "src/sync.js") ?? "none", 0.86);
           answers.reason = choiceAnswer("credential_theft:env_exfil", 0.84);
         } else if (text.includes("publish.yml")) {
-          answers.relevant_window = choiceAnswer(".github/workflows/publish.yml:1-10", 0.8);
+          answers.relevant_window = choiceAnswer(pickWindowId(state, "publish.yml", "last") ?? "none", 0.8);
           answers.reason = choiceAnswer("suspicious_ci:secret_webhook", 0.8);
         } else {
-          answers.relevant_window = choiceAnswer("src/update.js:1-8", 0.8);
+          answers.relevant_window = choiceAnswer(pickWindowId(state, "src/update.js") ?? "none", 0.8);
           answers.reason = choiceAnswer("dynamic_code:remote_eval", 0.8);
         }
       }
@@ -49,11 +57,16 @@ describe("scanProject", () => {
     const categories = new Set(report.findings.map((finding) => finding.category));
     expect(categories.has("credential_theft")).toBe(true);
     expect(categories.has("dynamic_code")).toBe(true);
-    expect(report.findings.some((finding) => finding.files.some((file) => file.includes("sync.js")))).toBe(
-      true,
-    );
+    const theft = report.findings.find((finding) => finding.category === "credential_theft");
+    expect(theft?.files).toEqual(["src/sync.js"]);
+    expect(theft?.chunkId).toMatch(/^chunk-/);
+    expect(theft?.lines[0]).toMatchObject({ path: "src/sync.js" });
+    expect(theft?.lines[0]?.start).toBeGreaterThan(0);
+    expect(theft?.lines[0]?.end).toBeGreaterThanOrEqual(theft?.lines[0]?.start ?? 0);
     expect(report.findings.some((finding) => finding.reason.includes("environment"))).toBe(true);
     expect(report.findings.every((finding) => finding.pass === 2)).toBe(true);
+    expect(formatReport(report)).toMatch(/chunk-\d+\s+src\/sync\.js:\d+-\d+/);
+    expect(formatReport(report)).toContain("Suspicious chunks");
   });
 
   it("retries a max_tokens error by splitting the chunk", async () => {

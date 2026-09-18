@@ -32,19 +32,17 @@ export function formatReport(report: ScanReport, options: FormatOptions = {}): s
     lines.push("");
   }
 
-  const highs = topCategoryScores(report);
-  if (highs.length > 0) {
-    lines.push(color.bold("Highest category scores"));
-    for (const row of highs) {
-      lines.push(`  ${row.label.padEnd(32)}  ${row.probability.toFixed(2)}  ${color.dim(row.files[0] ?? "")}`);
-    }
-    lines.push("");
-  }
-
   if (report.findings.length === 0) {
     lines.push("No findings above the report threshold.");
     return `${lines.join("\n")}\n`;
   }
+
+  lines.push(color.bold("Suspicious chunks"));
+  for (const finding of uniqueChunkFindings(report.findings)) {
+    lines.push(`  ${findingPointer(finding)}`);
+    lines.push(color.dim(`    ${finding.severity}  ${finding.category}  p=${finding.probability.toFixed(2)}`));
+  }
+  lines.push("");
 
   lines.push(color.bold(`Findings  ${report.findings.length}`));
   lines.push("");
@@ -69,9 +67,9 @@ function formatFinding(index: number, finding: Finding, color: Palette): string 
   const badge = severityBadge(finding.severity, color);
   const body = [
     `${index}. ${badge}  ${color.bold(finding.category)}`,
+    `   ${findingPointer(finding)}`,
     color.dim(`   ${finding.label}`),
     `   p=${finding.probability.toFixed(2)}   conf=${finding.confidence.toFixed(2)}   pass ${finding.pass}`,
-    `   ${finding.files.join(", ")}`,
   ];
 
   for (const line of finding.lines) {
@@ -95,20 +93,29 @@ function severityBadge(severity: Finding["severity"], color: Palette): string {
   return color.dim(label);
 }
 
-function topCategoryScores(report: ScanReport): Array<{ label: string; probability: number; files: string[] }> {
-  const best = new Map<string, { label: string; probability: number; files: string[] }>();
-  for (const chunk of report.categoryScores) {
-    for (const score of chunk.scores) {
-      const current = best.get(score.id);
-      if (!current || score.probability > current.probability) {
-        best.set(score.id, { label: score.label, probability: score.probability, files: chunk.files });
-      }
-    }
+export function findingPointer(finding: Finding): string {
+  const loc = finding.lines[0];
+  if (loc) {
+    return `${finding.chunkId}  ${loc.path}:${loc.start}-${loc.end}`;
   }
-  return [...best.values()]
-    .filter((row) => row.probability >= 0.15)
-    .sort((a, b) => b.probability - a.probability)
-    .slice(0, 6);
+  if (finding.files[0]) {
+    return `${finding.chunkId}  ${finding.files[0]}`;
+  }
+  return finding.chunkId;
+}
+
+function uniqueChunkFindings(findings: Finding[]): Finding[] {
+  const seen = new Set<string>();
+  const unique: Finding[] = [];
+  for (const finding of findings) {
+    const key = findingPointer(finding);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    unique.push(finding);
+  }
+  return unique;
 }
 
 export function reportToJson(report: ScanReport): string {

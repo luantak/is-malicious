@@ -61,3 +61,19 @@ export function scriptedAsker(script: (state: unknown) => JevAnswerMap): JevAske
 export function stateText(state: unknown): string {
   return JSON.stringify(state);
 }
+
+export function windowsFromState(state: unknown): Array<{ id: string; path: string }> {
+  if (!state || typeof state !== "object" || !("windows" in state)) {
+    return [];
+  }
+  const windows = (state as { windows?: Array<{ id: string; path: string }> }).windows;
+  return Array.isArray(windows) ? windows : [];
+}
+
+export function pickWindowId(state: unknown, pathPart: string, which: "first" | "last" = "first"): string | undefined {
+  const matches = windowsFromState(state).filter((window) => window.path.includes(pathPart));
+  if (matches.length === 0) {
+    return undefined;
+  }
+  return (which === "last" ? matches[matches.length - 1] : matches[0]).id;
+}

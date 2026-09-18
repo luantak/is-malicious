@@ -84,7 +84,7 @@ export function readScore(answers: JevAnswerMap, id: string): { score: number; c
   return { score: answer.score, confidence: answer.confidence };
 }
 
-export function buildPass1Questions(checks: SemanticCheck[]): QuestionMap {
+export function buildPass1Questions(checks: SemanticCheck[], files: SourceFile[] = []): QuestionMap {
   const questions: QuestionMap = {};
   for (const check of checks) {
     questions[check.id] = noul(check.instructions, check.criteria);
@@ -104,11 +104,22 @@ export function buildPass1Questions(checks: SemanticCheck[]): QuestionMap {
       ...checks.map((check) => [check.id, check.label]),
     ]),
   );
+  const filePaths = uniquePaths(files);
+  if (filePaths.length > 0) {
+    questions.hot_file = choice(
+      "If anything in `chunk.files` is suspicious, which file contains that behavior? Use `none` if nothing does.",
+      Object.fromEntries([["none", "No file in this chunk looks suspicious."], ...filePaths.map((path) => [path, null])]),
+    );
+  }
   return questions;
 }
 
-export function buildPass2Questions(checks: SemanticCheck[], windows: ReturnType<typeof lineWindows>): QuestionMap {
-  const questions = buildPass1Questions(checks);
+export function buildPass2Questions(
+  checks: SemanticCheck[],
+  files: SourceFile[],
+  windows: ReturnType<typeof lineWindows>,
+): QuestionMap {
+  const questions = buildPass1Questions(checks, files);
   const windowCriteria = Object.fromEntries([
     ["none", "No window contains the suspicious behavior."],
     ...windows.slice(0, 250).map((window) => [window.id, null]),
@@ -137,7 +148,7 @@ export function buildPass2Questions(checks: SemanticCheck[], windows: ReturnType
 export function chunkState(
   chunk: FileChunk,
   extraFiles: SourceFile[] = [],
-  options: { windows?: boolean } = {},
+  options: { windows?: ReturnType<typeof lineWindows> } = {},
 ): EntryType {
   const files = [...chunk.files, ...extraFiles];
   return {
@@ -148,7 +159,7 @@ export function chunkState(
     },
     ...(options.windows
       ? {
-          windows: lineWindows(files, 20).slice(0, 80).map((window) => ({
+          windows: options.windows.slice(0, 80).map((window) => ({
             id: window.id,
             path: window.path,
             start: window.start,
@@ -158,4 +169,8 @@ export function chunkState(
         }
       : {}),
   };
+}
+
+function uniquePaths(files: SourceFile[]): string[] {
+  return [...new Set(files.map((file) => file.relativePath))];
 }

@@ -43,6 +43,8 @@ describe("formatReport", () => {
     };
 
     const text = formatReport(report);
+    expect(text).toContain("Suspicious chunks");
+    expect(text).toContain("chunk-001  src/sync.js:2-6");
     expect(text).toContain("src/sync.js:2-6");
     expect(text).toContain("credential_theft");
     expect(text).toContain("p=0.91");

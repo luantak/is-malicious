@@ -15,6 +15,7 @@ import {
   type JevAnswerMap,
   type JevAsker,
 } from "./jev";
+import { findingPointer } from "./report";
 import {
   DEFAULT_CONCURRENCY,
   DEFAULT_THRESHOLDS,
@@ -72,7 +73,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
 
   async function evaluateChunk(chunk: FileChunk, depth = 0): Promise<void> {
     try {
-      const pass1 = await ask.ask(chunkState(chunk), buildPass1Questions(checks), options.model);
+      const pass1 = await ask.ask(chunkState(chunk), buildPass1Questions(checks, chunk.files), options.model);
       model = pass1.model;
       requests += 1;
       inputTokens += pass1.usage.inputTokens;
@@ -86,11 +87,12 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
       if (decision.escalate) {
         escalated += 1;
         extraFiles = neighborFiles(chunk.neighborPaths, byPath, chunk.files);
+        const located = locateFiles(chunk.files, extraFiles, pass1.answers);
+        const windows = lineWindows(located, 8).slice(0, 80);
         try {
-          const windows = lineWindows([...chunk.files, ...extraFiles], 20).slice(0, 80);
           const pass2 = await ask.ask(
-            chunkState(chunk, extraFiles, { windows: true }),
-            buildPass2Questions(checks, windows),
+            chunkState(chunk, extraFiles, { windows }),
+            buildPass2Questions(checks, [...chunk.files, ...extraFiles], windows),
             options.model,
           );
           answers = pass2.answers;
@@ -124,6 +126,12 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
           thresholds,
         }),
       );
+      const newest = findings
+        .filter((finding) => finding.chunkId === chunk.id)
+        .sort((a, b) => b.probability - a.probability);
+      if (newest[0]) {
+        emit(findingPointer(newest[0]), `${newest[0].category}  ${findingPointer(newest[0])}`);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const pieces = isMaxTokensError(error) && depth < 6 ? splitForRetry(chunk) : [];
@@ -227,6 +235,7 @@ function findingsFrom(input: {
   const reason = answers.reason?.type === "choice" ? readChoice(answers, "reason") : undefined;
   const window = answers.relevant_window?.type === "choice" ? readChoice(answers, "relevant_window") : undefined;
   const primary = answers.primary_category?.type === "choice" ? readChoice(answers, "primary_category") : undefined;
+  const hotFile = answers.hot_file?.type === "choice" ? readChoice(answers, "hot_file") : undefined;
 
   const results: Finding[] = [];
   for (const check of checks) {
@@ -248,7 +257,7 @@ function findingsFrom(input: {
       probability,
       confidence,
       severity,
-      files: implicatedFiles(files, window?.choice, check.id, reason?.choice, primary?.choice),
+      files: implicatedFiles(files, window?.choice, hotFile?.choice),
       lines: relevantLines(files, window?.choice),
       reason: reasonText(check, reason?.choice, primary?.choice),
       pass,
@@ -258,48 +267,53 @@ function findingsFrom(input: {
   return results;
 }
 
+function locateFiles(chunkFiles: SourceFile[], extraFiles: SourceFile[], answers: JevAnswerMap): SourceFile[] {
+  const all = [...chunkFiles, ...extraFiles];
+  const hot = answers.hot_file?.type === "choice" ? answers.hot_file.choice : undefined;
+  if (hot && hot !== "none") {
+    const match = all.filter((file) => file.relativePath === hot);
+    if (match.length > 0) {
+      return match;
+    }
+  }
+  return chunkFiles;
+}
+
 function implicatedFiles(
   files: SourceFile[],
   windowId: string | undefined,
-  checkId: string,
-  reasonId: string | undefined,
-  primaryId: string | undefined,
+  hotFile: string | undefined,
 ): string[] {
-  if (windowId && windowId !== "none") {
-    const pathPart = windowId.split(":")[0];
-    if (files.some((file) => file.relativePath === pathPart)) {
-      return [pathPart];
-    }
+  const parsed = parseWindowId(windowId);
+  if (parsed && files.some((file) => file.relativePath === parsed.path)) {
+    return [parsed.path];
   }
-  if (reasonId?.startsWith(`${checkId}:`) || primaryId === checkId) {
-    return files.map((file) => file.relativePath);
+  if (hotFile && hotFile !== "none" && files.some((file) => file.relativePath === hotFile)) {
+    return [hotFile];
   }
-  return files.map((file) => file.relativePath);
+  return files[0] ? [files[0].relativePath] : [];
+}
+
+function parseWindowId(windowId: string | undefined): { path: string; start: number; end: number } | undefined {
+  if (!windowId || windowId === "none") {
+    return undefined;
+  }
+  const match = windowId.match(/^(.*):(\d+)-(\d+)$/);
+  if (!match) {
+    return undefined;
+  }
+  return { path: match[1], start: Number(match[2]), end: Number(match[3]) };
 }
 
 function relevantLines(
   files: SourceFile[],
   windowId: string | undefined,
 ): Array<{ path: string; start: number; end: number; excerpt: string }> {
-  if (!windowId || windowId === "none") {
-    return files.slice(0, 2).map((file) => {
-      const base = file.lineOffset ?? 0;
-      const end = base + Math.min(file.lines.length, 12);
-      return {
-        path: file.relativePath,
-        start: base + 1,
-        end,
-        excerpt: excerpt(file, base + 1, end),
-      };
-    });
-  }
-  const match = windowId.match(/^(.*):(\d+)-(\d+)$/);
-  if (!match) {
+  const parsed = parseWindowId(windowId);
+  if (!parsed) {
     return [];
   }
-  const [, relativePath, startText, endText] = match;
-  const start = Number(startText);
-  const end = Number(endText);
+  const { path: relativePath, start, end } = parsed;
   const file = files.find((item) => {
     if (item.relativePath !== relativePath) {
       return false;
