@@ -112,24 +112,25 @@ Checkout needs `fetch-depth: 0` (or a fetch of the base branch) so the merge-bas
 
 ## Agent skill
 
-`skill/is-malicious` is a Cursor / agent skill. After a `git clone`, or when someone asks whether a tree is safe, the agent runs this CLI **before** `npm install`, `pip install`, or running the project.
+[![skills.sh](https://skills.sh/b/luantak/is-malicious)](https://skills.sh/luantak/is-malicious)
+
+After a `git clone`, or when someone asks whether a tree is safe, the agent should run this CLI **before** `npm install`, `pip install`, or running the project.
+
+Install it with the [skills CLI](https://www.skills.sh/docs):
 
 ```bash
-npx --yes is-malicious /path/to/project
+npx skills add luantak/is-malicious
 ```
 
-Or copy the skill into the agent:
+Global, for every project:
 
 ```bash
-npx --yes is-malicious --help
-mkdir -p ~/.cursor/skills ~/.agents/skills
-cp -R "$(npm root -g)/is-malicious/skill/is-malicious" ~/.cursor/skills/is-malicious
-# or from a checkout:
-# ln -sfn "$(pwd)/skill/is-malicious" ~/.cursor/skills/is-malicious
-export TYPESAFE_API_KEY=...
+npx skills add -g luantak/is-malicious
 ```
 
-The skill prefers `is-malicious` on `PATH`, then `npx is-malicious`, then a local checkout.
+The agent then calls `npx is-malicious`. You still need `TYPESAFE_API_KEY` in the environment.
+
+See [skills.sh/docs](https://www.skills.sh/docs) for list, update, and remove.
 
 ## Tests
 

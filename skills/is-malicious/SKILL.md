@@ -19,6 +19,8 @@ Scan **before** `npm install`, `pnpm install`, `yarn`, `pip install`, `poetry in
 
 ## How to run
 
+Install this skill with `npx skills add luantak/is-malicious`. See [skills.sh/docs](https://www.skills.sh/docs).
+
 Prefer the published CLI:
 
 ```bash
@@ -28,7 +30,7 @@ npx --yes is-malicious <path>
 Or the wrapper next to this file:
 
 ```bash
-~/.cursor/skills/is-malicious/scripts/run.sh <path>
+scripts/run.sh <path>
 ```
 
 The script prints the human report on stdout. Exit code 1 means at least one high finding. Exit 2 means the scanner or key is missing.

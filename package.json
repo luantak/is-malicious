@@ -9,7 +9,7 @@
   "types": "dist/index.d.ts",
   "files": [
     "dist",
-    "skill",
+    "skills",
     "README.md",
     "LICENSE",
     "examples"
