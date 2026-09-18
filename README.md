@@ -1,4 +1,4 @@
-# is-malicious
+# is-malicious?
 
 Scan a codebase for hidden, deceptive, or data-stealing behavior with TypeSafe Jev. The CLI sends source, configuration, build, and CI files to Jev for review, then points you to suspicious files and lines.
 
@@ -46,6 +46,8 @@ is-malicious . --diff-from origin/main
 This scans the changed files, not just the changed lines, so you can review a PR without paying to rescan the whole project.
 
 ## Reading the report
+
+<img width="1106" height="341" alt="Screenshot 2026-09-18 at 19 35 35" src="https://github.com/user-attachments/assets/611c979a-8dd4-4fc8-8963-0843314e6a55" />
 
 Findings include a file, line range, category, probability, confidence, and a short reason label. Use these to decide which code to read first.
 
