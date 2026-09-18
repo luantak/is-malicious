@@ -62,15 +62,27 @@ These categories live in `src/checks/builtin.ts`. Add an object and register it.
 
 Noul answers have no separate `confidence` field. The report uses `2 * |p - 0.5|` so a 0.91 yes and a 0.09 no both read as confident.
 
-## Setup
+## Install
+
+```bash
+export TYPESAFE_API_KEY=...
+npx is-malicious /path/to/project
+```
+
+Or install it once:
+
+```bash
+npm install -g is-malicious
+is-malicious /path/to/project
+```
+
+From a checkout:
 
 ```bash
 npm install
-export TYPESAFE_API_KEY=...
+npm run build
 npx tsx src/cli.ts /path/to/project
 ```
-
-Or `npm run build` and `node dist/cli.js`.
 
 ```
 is-malicious [path] [--json] [--model jev-latest] [--concurrency 12] [--min-prob 0.40]
@@ -83,14 +95,21 @@ Exit code 1 means at least one high finding. Exit 0 means none of the findings c
 `skill/is-malicious` is a Cursor / agent skill. After a `git clone`, or when someone asks whether a tree is safe, the agent runs this CLI **before** `npm install`, `pip install`, or running the project.
 
 ```bash
+npx --yes is-malicious /path/to/project
+```
+
+Or copy the skill into the agent:
+
+```bash
+npx --yes is-malicious --help
 mkdir -p ~/.cursor/skills ~/.agents/skills
-ln -sfn "$(pwd)/skill/is-malicious" ~/.cursor/skills/is-malicious
-ln -sfn "$(pwd)/skill/is-malicious" ~/.agents/skills/is-malicious
-export IS_MALICIOUS_ROOT="$(pwd)"
+cp -R "$(npm root -g)/is-malicious/skill/is-malicious" ~/.cursor/skills/is-malicious
+# or from a checkout:
+# ln -sfn "$(pwd)/skill/is-malicious" ~/.cursor/skills/is-malicious
 export TYPESAFE_API_KEY=...
 ```
 
-The skill looks for `is-malicious` on `PATH`, then `$IS_MALICIOUS_ROOT`, then this checkout.
+The skill prefers `is-malicious` on `PATH`, then `npx is-malicious`, then a local checkout.
 
 ## Tests
 

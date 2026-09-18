@@ -35,16 +35,21 @@ find_cli() {
 
   local root
   for root in "${candidates[@]}"; do
-    if [[ -f "$root/src/cli.ts" ]]; then
+    if [[ -f "$root/src/cli.ts" || -f "$root/dist/cli.js" ]]; then
       echo "$root"
       return
     fi
   done
+
+  if command -v npx >/dev/null 2>&1; then
+    echo "npx"
+    return
+  fi
   return 1
 }
 
 resolved="$(find_cli)" || {
-  echo "is-malicious: CLI not found. Install the is-malicious repo, put is-malicious on PATH, or set IS_MALICIOUS_ROOT." >&2
+  echo "is-malicious: CLI not found. npm install -g is-malicious, or set IS_MALICIOUS_ROOT." >&2
   exit 2
 }
 
@@ -52,11 +57,15 @@ if [[ "$resolved" == "bin" ]]; then
   exec is-malicious "$target"
 fi
 
+if [[ "$resolved" == "npx" ]]; then
+  exec npx --yes is-malicious "$target"
+fi
+
 if [[ -f "$resolved/dist/cli.js" ]]; then
   exec node "$resolved/dist/cli.js" "$target"
 fi
 
-if command -v npx >/dev/null 2>&1; then
+if command -v npx >/dev/null 2>&1 && [[ -f "$resolved/src/cli.ts" ]]; then
   exec npx --yes tsx "$resolved/src/cli.ts" "$target"
 fi
 

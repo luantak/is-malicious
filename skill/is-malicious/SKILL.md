@@ -19,21 +19,21 @@ Scan **before** `npm install`, `pnpm install`, `yarn`, `pip install`, `poetry in
 
 ## How to run
 
+Prefer the published CLI:
+
 ```bash
-skill/is-malicious/scripts/run.sh <path>
+npx --yes is-malicious <path>
 ```
 
-If this skill was copied or symlinked, use the script next to this file:
+Or the wrapper next to this file:
 
 ```bash
 ~/.cursor/skills/is-malicious/scripts/run.sh <path>
 ```
 
-or `~/.agents/skills/is-malicious/scripts/run.sh <path>`.
-
 The script prints the human report on stdout. Exit code 1 means at least one high finding. Exit 2 means the scanner or key is missing.
 
-Needs `TYPESAFE_API_KEY`. Optional: `IS_MALICIOUS_ROOT` pointing at the is-malicious checkout.
+Needs `TYPESAFE_API_KEY`. Optional: `IS_MALICIOUS_ROOT` for a local checkout.
 
 Do not pass `--json` unless the user asked for machine output.
 

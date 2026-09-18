@@ -1,14 +1,21 @@
 {
   "name": "is-malicious",
   "version": "0.1.0",
-  "description": "Scan a codebase for suspicious behavior with TypeSafe Jev",
+  "description": "Scan a codebase for covert, deceptive, or data-stealing behavior with TypeSafe Jev",
   "bin": {
     "is-malicious": "dist/cli.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "skill",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
+    "prepack": "npm run build",
     "scan": "tsx src/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -17,6 +24,26 @@
     "node": ">=20"
   },
   "license": "MIT",
+  "keywords": [
+    "malware",
+    "security",
+    "scanner",
+    "telemetry",
+    "cli",
+    "jev",
+    "typesafe"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luantak/is-malicious.git"
+  },
+  "bugs": {
+    "url": "https://github.com/luantak/is-malicious/issues"
+  },
+  "homepage": "https://github.com/luantak/is-malicious#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@typesafe-ai/sdk": "^0.6.0",
     "ignore": "^7.0.9"
