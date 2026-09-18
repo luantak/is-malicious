@@ -24,6 +24,10 @@ const SIGNAL_PATTERNS: RegExp[] = [
   /\b(telemetry|analytics|sentry|posthog|segment|mixpanel|amplitude|crashlytics|datadog|feature[- ]?flag)\b/i,
   /\b(Runtime\.getRuntime|ProcessBuilder|exec\.Command|Command::new|Open3|Kernel\.system)\b/i,
   /\[\s*['"`](eval|exec|spawn|system|require)['"`]\s*\]/,
+  /\b(rejectUnauthorized|NODE_TLS_REJECT_UNAUTHORIZED|InsecureSkipVerify|verify\s*=\s*False)\b/i,
+  /\b(getUserMedia|getDisplayMedia|clipboard|keylog|AddClipboardFormatListener|GetAsyncKeyState)\b/i,
+  /\b(xmrig|stratum\+tcp|cryptonight|monero)\b/i,
+  /\b(psexec|wmic|winrm|ssh-copy-id|docker\.sock)\b/i,
 ];
 
 const KEEP_JSON_NAMES = new Set([

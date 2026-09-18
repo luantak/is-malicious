@@ -19,20 +19,30 @@ describe("check registry", () => {
       "deception",
       "suspicious_ci",
       "telemetry",
+      "authentication_bypass",
+      "command_and_control",
+      "surveillance",
+      "destructive_behavior",
+      "supply_chain",
+      "security_weakening",
+      "resource_abuse",
+      "lateral_movement",
+      "anti_removal",
+      "covert_fingerprinting",
     ]);
   });
 
   it("accepts another check without rewriting the pipeline", () => {
     registerCheck({
-      id: "supply_chain",
-      label: "supply-chain tampering",
-      instructions: "Does the chunk replace a dependency with a hostile one?",
+      id: "custom_extra",
+      label: "custom extra check",
+      instructions: "Does the chunk do a project-specific bad thing?",
       criteria: {
-        true: "A dependency is swapped or padded with hostile code.",
-        false: "Dependencies look ordinary.",
+        true: "The custom condition is present.",
+        false: "The custom condition is absent.",
       },
-      reasons: { none: "No supply-chain issue." },
+      reasons: { none: "No extra issue." },
     });
-    expect(listChecks().some((check) => check.id === "supply_chain")).toBe(true);
+    expect(listChecks().some((check) => check.id === "custom_extra")).toBe(true);
   });
 });

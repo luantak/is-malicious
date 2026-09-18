@@ -162,4 +162,164 @@ export const builtinChecks: SemanticCheck[] = [
       none: "No telemetry stands out.",
     },
   },
+  {
+    id: "authentication_bypass",
+    label: "authentication bypass / hidden backdoor",
+    instructions:
+      "Does `chunk.files` add a hidden account, hardcoded credential, secret path, or other way to skip authentication that a normal operator would not see, rather than a documented admin recovery flow or test fixture?",
+    criteria: {
+      true: "There is a hidden login, master password, debug door, or auth skip that is not a documented recovery or test-only path.",
+      false: "Authentication is ordinary, any override is a documented admin or test hook, or there is no auth here.",
+    },
+    reasons: {
+      hardcoded_door: "A hardcoded password, token, or account unlocks the system.",
+      secret_route: "A hidden URL, header, or flag skips authentication.",
+      always_allow: "Auth checks are disabled or short-circuited in production code.",
+      none: "No backdoor or auth bypass stands out.",
+    },
+  },
+  {
+    id: "command_and_control",
+    label: "remote command execution / command-and-control",
+    instructions:
+      "Does `chunk.files` take commands from a remote host and run them on this machine (a shell, script, or API the operator did not issue), rather than a documented remote-admin, agent, or job-runner product?",
+    criteria: {
+      true: "A remote party can send commands that this code executes, and that channel is not a documented admin or worker feature.",
+      false: "Any remote control is a documented agent, SSH, or job API, or the code does not run remote commands.",
+    },
+    reasons: {
+      reverse_shell: "Opens a reverse shell or remote-command channel.",
+      c2_poll: "Polls a host for commands and executes whatever comes back.",
+      unattended_rpc: "Exposes an unauthenticated or hidden RPC that runs OS commands.",
+      none: "No covert remote-command channel stands out.",
+    },
+  },
+  {
+    id: "surveillance",
+    label: "surveillance / input and device capture",
+    instructions:
+      "Does `chunk.files` capture keystrokes, clipboard, screen, microphone, camera, or location without a matching documented feature, rather than a screen recorder, accessibility tool, or conferencing app that advertises that capture?",
+    criteria: {
+      true: "Input or device capture is hidden, broader than the stated feature, or sent somewhere the user would not expect.",
+      false: "Any capture matches a documented recorder, a11y, or conferencing feature, or there is no capture.",
+    },
+    reasons: {
+      keylog: "Records keystrokes or input events covertly.",
+      clipboard_or_screen: "Reads clipboard, screenshots, or the display without a matching feature.",
+      mic_cam_or_location: "Taps microphone, camera, or location without a matching feature.",
+      none: "No covert capture stands out.",
+    },
+  },
+  {
+    id: "destructive_behavior",
+    label: "destructive behavior / sabotage",
+    instructions:
+      "Does `chunk.files` wipe, encrypt-for-ransom, corrupt, or brick files, disks, firmware, or accounts in a way the product does not advertise, rather than a documented formatter, factory-reset, or uninstall cleaner?",
+    criteria: {
+      true: "The code destroys or ransoms user data or the system without a matching documented wipe or reset feature.",
+      false: "Any deletion is a documented reset, uninstall, or user-requested cleanup, or there is no destructive action.",
+    },
+    reasons: {
+      wipe: "Deletes or formats user data or disks without a matching reset feature.",
+      ransom: "Encrypts files and demands or implies payment to restore them.",
+      corrupt: "Silently corrupts data, configs, or firmware so the system fails.",
+      none: "No sabotage stands out.",
+    },
+  },
+  {
+    id: "supply_chain",
+    label: "supply-chain manipulation",
+    instructions:
+      "Does `chunk.files` swap, typosquat, or inject a dependency, install script, or published artifact so that someone else's build or install pulls hostile code, rather than a normal version bump or documented mirror?",
+    criteria: {
+      true: "A dependency, lockfile, installer, or publish step is altered to deliver code the project does not actually contain.",
+      false: "Dependency and publish changes are ordinary version pins or documented mirrors, or there is no package metadata here.",
+    },
+    reasons: {
+      dependency_swap: "Replaces a package name, URL, or integrity hash with an unexpected source.",
+      install_hook: "A preinstall, postinstall, or setup hook pulls or runs extra unreviewed code.",
+      artifact_inject: "Published or vendored artifacts do not match the reviewed source.",
+      none: "No supply-chain manipulation stands out.",
+    },
+  },
+  {
+    id: "security_weakening",
+    label: "security weakening",
+    instructions:
+      "Does `chunk.files` turn off TLS verification, signature checks, sandboxing, updates, or antivirus/firewall protections in a way the product does not need, rather than a documented debug flag or enterprise policy hook?",
+    criteria: {
+      true: "Safety checks or host defenses are disabled, bypassed, or gutted without a matching documented debug or policy feature.",
+      false: "Any relaxation is a documented insecure-dev flag or admin policy, or protections stay in place.",
+    },
+    reasons: {
+      tls_or_signature: "Skips certificate, TLS, or code-signature verification.",
+      sandbox_off: "Disables a sandbox, CSP, or isolation boundary.",
+      defense_tamper: "Stops, excludes, or reconfigures antivirus, firewall, or updates to hide activity.",
+      none: "No security weakening stands out.",
+    },
+  },
+  {
+    id: "resource_abuse",
+    label: "resource abuse / cryptomining / proxying",
+    instructions:
+      "Does `chunk.files` use this machine's CPU, GPU, bandwidth, or network identity for mining, scanning, or proxying that the product does not advertise, rather than a documented renderer, encoder, or user-requested share?",
+    criteria: {
+      true: "The machine is used as a miner, open proxy, or scan bot without a matching documented feature.",
+      false: "Heavy compute or proxying is a documented product feature the user asked for, or there is none.",
+    },
+    reasons: {
+      miner: "Runs a cryptominer or stratum client.",
+      open_proxy: "Turns the host into a relay, botnet worker, or residential proxy.",
+      abuse_scan: "Uses the host to scan, flood, or otherwise abuse third parties.",
+      none: "No resource abuse stands out.",
+    },
+  },
+  {
+    id: "lateral_movement",
+    label: "lateral movement / propagation",
+    instructions:
+      "Does `chunk.files` copy itself or a payload onto other hosts, shares, containers, or accounts on the network, rather than a documented fleet deploy, sync, or clustering feature?",
+    criteria: {
+      true: "The code spreads to other machines or accounts in a way that looks like worming, not a documented deploy.",
+      false: "Any multi-host action is a documented deploy, backup, or cluster join, or it stays on this machine.",
+    },
+    reasons: {
+      worm_copy: "Copies itself or a dropper onto other hosts or shares.",
+      credential_reuse: "Reuses stolen or local credentials to log into other systems.",
+      service_spread: "Abuses SSH, SMB, RDP, Docker, or similar to propagate.",
+      none: "No lateral movement stands out.",
+    },
+  },
+  {
+    id: "anti_removal",
+    label: "anti-removal / self-protection",
+    instructions:
+      "Does `chunk.files` block uninstall, reinstall itself after deletion, or fight the user or an admin trying to remove it, rather than a documented service that requires a normal stop/uninstall step?",
+    criteria: {
+      true: "The code resists removal, respawns after delete, or locks the user out of uninstall.",
+      false: "Any protect-from-stop behavior is a documented service or license manager, or there is none.",
+    },
+    reasons: {
+      uninstall_block: "Hides, disables, or fails the uninstall / remove path.",
+      respawn: "Recreates files, services, or tasks after the user deletes them.",
+      tamper_watch: "Watches for removal or analysis and fights back (kill, lock, wipe).",
+      none: "No anti-removal behavior stands out.",
+    },
+  },
+  {
+    id: "covert_fingerprinting",
+    label: "covert fingerprinting / excessive collection",
+    instructions:
+      "Does `chunk.files` fingerprint the device or user, or collect more environment, identity, or browsing data than a documented analytics or crash pipeline would need, in a covert or excessive way? Ordinary opt-in telemetry belongs in the telemetry category, not here.",
+    criteria: {
+      true: "Collection is hidden, far beyond a normal analytics/crash SDK, or used to identify the user without a matching disclosure.",
+      false: "Any collection is ordinary documented telemetry, or there is no extra fingerprinting.",
+    },
+    reasons: {
+      device_fingerprint: "Builds a hidden device or browser fingerprint.",
+      excess_identity: "Collects identifiers, files, or environment far beyond a crash/usage ping.",
+      silent_track: "Tracks the user across sessions or apps without a matching disclosure.",
+      none: "No covert fingerprinting or excess collection stands out.",
+    },
+  },
 ];
