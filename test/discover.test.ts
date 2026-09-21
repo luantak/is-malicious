@@ -63,6 +63,14 @@ describe("discover", () => {
     await fs.writeFile(path.join(root, ".env.local"), "PASSWORD=secret\n");
     await fs.writeFile(path.join(root, "credentials.json"), '{ "private_key": "secret" }');
     await fs.writeFile(
+      path.join(root, "oauth.json"),
+      '{ "client_secret": "secret", "token_uri": "https://auth.example.test/token" }',
+    );
+    await fs.writeFile(
+      path.join(root, "passive.json"),
+      '{ "apiKey": "secret", "project_id": "powershell", "fetch": "disabled" }',
+    );
+    await fs.writeFile(
       path.join(root, "loader.json"),
       '{ "private_key": "secret", "loader": "eval(payload)" }',
     );
@@ -71,6 +79,8 @@ describe("discover", () => {
     expect(relative).not.toContain(".env");
     expect(relative).not.toContain(".env.local");
     expect(relative).not.toContain("credentials.json");
+    expect(relative).not.toContain("oauth.json");
+    expect(relative).not.toContain("passive.json");
     expect(relative).toContain("loader.json");
   });
 });
