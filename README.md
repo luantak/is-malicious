@@ -36,6 +36,8 @@ Telemetry appears separately as `info`, including documented analytics, crash re
 | `1` | At least one high-severity finding. |
 | `2` | The command failed, for example because of an invalid flag or a scan error. |
 
+If any chunk cannot be scanned, the report lists it as skipped and the command exits with code `2`.
+
 Both high and low scores can be wrong. Review the flagged code and the scan's coverage before deciding whether to run a project.
 
 ## What it checks
@@ -63,8 +65,9 @@ The scanner reads selected text files. It does not inspect binaries, disk images
 It respects `.gitignore` and skips files such as:
 
 - Images, binaries, and lockfiles.
+- Environment files named `.env` or `.env.*`.
 - Generated bundles and compiled `dist`, `lib`, and `build` output.
-- TypeScript declarations, `tsconfig`, and JSON configuration that its filters exclude.
+- TypeScript declarations, `tsconfig`, and JSON configuration that its filters exclude. Credential-like or long encoded values alone do not make a non-manifest JSON file eligible for upload.
 - Files larger than 400,000 bytes and unsupported file types.
 
 Malicious behavior in skipped files will not appear in the scan.

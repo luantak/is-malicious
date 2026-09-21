@@ -3,7 +3,7 @@ import { shouldColor } from "./color";
 import { createProgressRenderer } from "./progress";
 import { formatReport, reportToJson } from "./report";
 import { scanProject } from "./scan";
-import { DEFAULT_CONCURRENCY } from "./types";
+import { DEFAULT_CONCURRENCY, type ScanReport } from "./types";
 
 interface CliArgs {
   root: string;
@@ -30,7 +30,11 @@ function parseArgs(argv: string[]): CliArgs {
     } else if (token === "--concurrency") {
       args.concurrency = Number(argv[++i]);
     } else if (token === "--min-prob") {
-      args.minProb = Number(argv[++i]);
+      const value = Number(argv[++i]);
+      if (!Number.isFinite(value) || value < 0 || value > 1) {
+        throw new Error("--min-prob must be a number between 0 and 1");
+      }
+      args.minProb = value;
     } else if (token === "--diff-from") {
       args.diffFrom = argv[++i];
     } else if (token.startsWith("-")) {
@@ -60,6 +64,13 @@ function usage(): string {
     "",
     "Set TYPESAFE_API_KEY in the environment.",
   ].join("\n");
+}
+
+export function exitCodeForReport(report: Pick<ScanReport, "findings" | "skipped">): number {
+  if (report.skipped.length > 0) {
+    return 2;
+  }
+  return report.findings.some((finding) => finding.severity === "high") ? 1 : 0;
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {
@@ -98,7 +109,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   process.stdout.write(
     args.json ? reportToJson(report) : formatReport(report, { color: shouldColor(process.stdout) }),
   );
-  return report.findings.some((finding) => finding.severity === "high") ? 1 : 0;
+  return exitCodeForReport(report);
 }
 
 if (require.main === module) {
