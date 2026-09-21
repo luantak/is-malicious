@@ -168,7 +168,7 @@ export function classifyFile(relativePath: string): FileRole | null {
   const lower = base.toLowerCase();
   const ext = path.extname(lower);
 
-  if (SKIP_FILES.has(lower) || SKIP_EXTENSIONS.has(ext)) {
+  if (SKIP_FILES.has(lower) || SKIP_EXTENSIONS.has(ext) || lower === ".env" || lower.startsWith(".env.")) {
     return null;
   }
   if (GENERATED_SUFFIXES.some((suffix) => lower.endsWith(suffix))) {
@@ -200,7 +200,7 @@ export function classifyFile(relativePath: string): FileRole | null {
   if (BUILD_NAMES.has(lower) || lower.includes("webpack") || lower.includes("rollup.config")) {
     return "build";
   }
-  if (CONFIG_NAMES.has(lower) || CONFIG_EXTENSIONS.has(ext) || lower.startsWith(".env")) {
+  if (CONFIG_NAMES.has(lower) || CONFIG_EXTENSIONS.has(ext)) {
     return "config";
   }
   if (SOURCE_EXTENSIONS.has(ext)) {

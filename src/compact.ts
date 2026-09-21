@@ -3,9 +3,8 @@ import type { SourceFile } from "./types";
 
 export const DEFAULT_MAX_FILES_PER_CHUNK = 16;
 
-const SIGNAL_PATTERNS: RegExp[] = [
+const ACTIVE_BEHAVIOR_SIGNAL_PATTERNS: RegExp[] = [
   /\b(fetch|axios|XMLHttpRequest|WebSocket|http\.request|https\.request|net\.connect|ipcRenderer)\b/i,
-  /\bhttps?:\/\/|\bftp:\/\/|\bwss:\/\//i,
   /\b(curl|wget|ncat|nc\s|powershell|pwsh|cmd\.exe|\/bin\/sh|\/bin\/bash)\b/i,
   /\b(eval|execSync|execFile|spawnSync|spawn|fork|popen|subprocess|child_process|os\.system|os\.popen)\b/i,
   /\b(Function|compile|__import__|getattr|ctypes|pickle|marshal|yaml\.load)\s*\(/i,
@@ -13,21 +12,38 @@ const SIGNAL_PATTERNS: RegExp[] = [
   /set(?:Timeout|Interval)\s*\(\s*['"`]/,
   /\b(atob|btoa|fromCharCode|Buffer\.from|base64|unhexlify|hexlify)\b/i,
   /(?:\\x[0-9a-fA-F]{2}){6,}|(?:\\u[0-9a-fA-F]{4}){4,}/,
-  /[A-Za-z0-9+/]{40,}={0,2}/,
   /\b(process\.env|os\.environ|homedir|appdata|keychain|localStorage|sessionStorage|document\.cookie)\b/i,
-  /\b(id_rsa|authorized_keys|npm_token|aws_secret|secret_access|private[_-]?key|authorization)\b/i,
   /\b(crontab|systemd|launchagents|schtasks|startup folder|currentversion\\run)\b/i,
   /\b(chmod|chown|setuid|sudo|runas|osascript|reg\s+add)\b/i,
   /\b(writeFile|writefilesync|createWriteStream|unlink|rmsync|rmtree|shutil)\b/i,
-  /\b(secrets\.|NPM_TOKEN|AWS_SECRET|WEBHOOK|curl\s+[^\n]*\|\s*(ba)?sh)\b/i,
-  /\b(password|passwd|login|sign[- ]?in|verify your|grant access|click allow|update now|credentials?)\b/i,
-  /\b(telemetry|analytics|sentry|posthog|segment|mixpanel|amplitude|crashlytics|datadog|feature[- ]?flag)\b/i,
+  /\bcurl\s+[^\n]*\|\s*(ba)?sh\b/i,
   /\b(Runtime\.getRuntime|ProcessBuilder|exec\.Command|Command::new|Open3|Kernel\.system)\b/i,
   /\[\s*['"`](eval|exec|spawn|system|require)['"`]\s*\]/,
   /\b(rejectUnauthorized|NODE_TLS_REJECT_UNAUTHORIZED|InsecureSkipVerify|verify\s*=\s*False)\b/i,
   /\b(getUserMedia|getDisplayMedia|clipboard|keylog|AddClipboardFormatListener|GetAsyncKeyState)\b/i,
   /\b(xmrig|stratum\+tcp|cryptonight|monero)\b/i,
   /\b(psexec|wmic|winrm|ssh-copy-id|docker\.sock)\b/i,
+];
+
+const CONTEXT_SIGNAL_PATTERNS: RegExp[] = [
+  /\bhttps?:\/\/|\bftp:\/\/|\bwss:\/\//i,
+  /\b(login|sign[- ]?in|verify your|grant access|click allow|update now)\b/i,
+  /\b(telemetry|analytics|sentry|posthog|segment|mixpanel|amplitude|crashlytics|datadog|feature[- ]?flag)\b/i,
+];
+
+// These are useful scan signals in source code, but must not make an otherwise
+// low-value JSON file eligible because the matching value may be a real secret.
+const SENSITIVE_SIGNAL_PATTERNS: RegExp[] = [
+  /[A-Za-z0-9+/]{40,}={0,2}/,
+  /\b(id_rsa|authorized_keys|npm_token|aws_secret|secret_access|private[_-]?key|authorization)\b/i,
+  /\b(secrets\.|NPM_TOKEN|AWS_SECRET|WEBHOOK)\b/i,
+  /\b(password|passwd|credentials?)\b/i,
+];
+
+const SIGNAL_PATTERNS = [
+  ...ACTIVE_BEHAVIOR_SIGNAL_PATTERNS,
+  ...CONTEXT_SIGNAL_PATTERNS,
+  ...SENSITIVE_SIGNAL_PATTERNS,
 ];
 
 const KEEP_JSON_NAMES = new Set([
@@ -105,7 +121,16 @@ export function isLowValueConfig(relativePath: string, content: string): boolean
   }
   const base = path.basename(relativePath).toLowerCase();
   const ext = path.extname(base);
-  return ext === ".json" && !KEEP_JSON_NAMES.has(base) && !textHasSignal(content) && !/"scripts"\s*:/.test(content);
+  if (ext !== ".json" || KEEP_JSON_NAMES.has(base)) {
+    return false;
+  }
+  if (ACTIVE_BEHAVIOR_SIGNAL_PATTERNS.some((pattern) => pattern.test(content)) || /"scripts"\s*:/.test(content)) {
+    return false;
+  }
+  if (SENSITIVE_SIGNAL_PATTERNS.some((pattern) => pattern.test(content))) {
+    return true;
+  }
+  return !CONTEXT_SIGNAL_PATTERNS.some((pattern) => pattern.test(content));
 }
 
 export function lineHasSignal(line: string): boolean {
