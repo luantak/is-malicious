@@ -35,9 +35,42 @@ const CONTEXT_SIGNAL_PATTERNS: RegExp[] = [
 // low-value JSON file eligible because the matching value may be a real secret.
 const SENSITIVE_SIGNAL_PATTERNS: RegExp[] = [
   /[A-Za-z0-9+/]{40,}={0,2}/,
-  /\b(id_rsa|authorized_keys|npm_token|aws_secret|secret_access|private[_-]?key|authorization)\b/i,
+  /\b(id_rsa|authorized_keys|npm_token|aws_secret|secret_access|private[_-]?key|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret[_-]?key|authorization)\b/i,
   /\b(secrets\.|NPM_TOKEN|AWS_SECRET|WEBHOOK)\b/i,
   /\b(password|passwd|credentials?)\b/i,
+];
+
+const SENSITIVE_JSON_KEYS = new Set([
+  "apikey",
+  "accesstoken",
+  "refreshtoken",
+  "clientsecret",
+  "secretkey",
+  "privatekey",
+  "password",
+  "passwd",
+  "credential",
+  "credentials",
+  "authorization",
+  "npmtoken",
+  "awssecret",
+  "secretaccesskey",
+  "webhook",
+]);
+
+const JSON_EXECUTION_PATTERNS: RegExp[] = [
+  /\b(fetch|axios|XMLHttpRequest|WebSocket|http\.request|https\.request|net\.connect|ipcRenderer)\s*\(/i,
+  /\b(eval|execSync|execFile|spawnSync|spawn|fork|popen|subprocess|os\.system|os\.popen)\s*\(/i,
+  /\b(Function|compile|__import__|getattr|ctypes|pickle|marshal|yaml\.load)\s*\(/i,
+  /new\s+Function\b/i,
+  /set(?:Timeout|Interval)\s*\(\s*['"`]/,
+  /\b(atob|btoa|fromCharCode|Buffer\.from|unhexlify|hexlify)\s*\(/i,
+  /(?:\\x[0-9a-fA-F]{2}){6,}|(?:\\u[0-9a-fA-F]{4}){4,}/,
+  /\b(process\.env|os\.environ|document\.cookie)\b/i,
+  /\b(curl|wget|powershell|pwsh|cmd\.exe|\/bin\/sh|\/bin\/bash)\s+\S+/i,
+  /\bcurl\s+[^\n]*\|\s*(ba)?sh\b/i,
+  /\b(Runtime\.getRuntime|ProcessBuilder|exec\.Command|Command::new|Open3|Kernel\.system)\b/i,
+  /\[\s*['"`](eval|exec|spawn|system|require)['"`]\s*\]/,
 ];
 
 const SIGNAL_PATTERNS = [
@@ -124,13 +157,34 @@ export function isLowValueConfig(relativePath: string, content: string): boolean
   if (ext !== ".json" || KEEP_JSON_NAMES.has(base)) {
     return false;
   }
-  if (ACTIVE_BEHAVIOR_SIGNAL_PATTERNS.some((pattern) => pattern.test(content)) || /"scripts"\s*:/.test(content)) {
+  if (JSON_EXECUTION_PATTERNS.some((pattern) => pattern.test(content)) || /"scripts"\s*:/.test(content)) {
     return false;
   }
-  if (SENSITIVE_SIGNAL_PATTERNS.some((pattern) => pattern.test(content))) {
+  if (hasSensitiveJsonKey(content) || SENSITIVE_SIGNAL_PATTERNS.some((pattern) => pattern.test(content))) {
     return true;
   }
   return !CONTEXT_SIGNAL_PATTERNS.some((pattern) => pattern.test(content));
+}
+
+function hasSensitiveJsonKey(content: string): boolean {
+  try {
+    return valueHasSensitiveKey(JSON.parse(content));
+  } catch {
+    return false;
+  }
+}
+
+function valueHasSensitiveKey(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(valueHasSensitiveKey);
+  }
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+  return Object.entries(value).some(([key, child]) => {
+    const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return SENSITIVE_JSON_KEYS.has(normalized) || valueHasSensitiveKey(child);
+  });
 }
 
 export function lineHasSignal(line: string): boolean {

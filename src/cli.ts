@@ -30,7 +30,11 @@ function parseArgs(argv: string[]): CliArgs {
     } else if (token === "--concurrency") {
       args.concurrency = Number(argv[++i]);
     } else if (token === "--min-prob") {
-      const value = Number(argv[++i]);
+      const raw = argv[++i];
+      if (raw === undefined || raw.trim().length === 0) {
+        throw new Error("--min-prob must be a number between 0 and 1");
+      }
+      const value = Number(raw);
       if (!Number.isFinite(value) || value < 0 || value > 1) {
         throw new Error("--min-prob must be a number between 0 and 1");
       }
