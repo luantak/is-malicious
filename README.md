@@ -15,6 +15,15 @@ npx is-malicious /path/to/project
 
 Omit the path to scan the current directory. Scans send file contents to the TypeSafe API and use paid input tokens. The report includes token usage and a calculated input cost.
 
+To use another service that implements the [TypeSafe evaluation API](https://docs.typesafe.ai/api), set its API root and key, then choose a model it serves:
+
+```bash
+export TYPESAFE_API_KEY=your-provider-key
+is-malicious /path/to/project --base-url http://localhost:8000 --model your-model
+```
+
+The API root can also come from `TYPESAFE_BASE_URL`; `--base-url` takes precedence. The service must accept `POST /v1/systemone` with TypeSafe's `state`, `model`, and typed `questions` request and return matching `answers` and `usage`. The CLI reports token counts for other providers but leaves cost unknown because their prices vary. File contents go to the configured endpoint. Model quality and scan accuracy depend on the provider.
+
 To install the CLI globally:
 
 ```bash
@@ -139,6 +148,7 @@ is-malicious [path] [options]
 | --- | --- | --- |
 | `--json` | Print the full report as JSON | Off |
 | `--model <name>` | Choose a Jev model | `jev-latest` |
+| `--base-url <url>` | Use a TypeSafe-compatible API root | `https://api.typesafe.ai` |
 | `--concurrency <n>` | Set the number of parallel chunk requests | `12` |
 | `--min-prob <n>` | Set the minimum category probability to report | `0.40` |
 | `--diff-from <ref>` | Scan only files changed since a Git ref | Scan all eligible files |

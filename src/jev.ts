@@ -28,9 +28,10 @@ export interface JevAsker {
   ask(state: EntryType, questions: QuestionMap, model?: string): Promise<JevResult>;
 }
 
-export function createJevAsker(options: { apiKey?: string; timeout?: number } = {}): JevAsker {
+export function createJevAsker(options: { apiKey?: string; baseURL?: string; timeout?: number } = {}): JevAsker {
   const client = new TypeSafeClient({
     apiKey: options.apiKey,
+    baseURL: options.baseURL,
     timeout: options.timeout ?? 60_000,
   });
 

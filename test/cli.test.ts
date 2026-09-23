@@ -67,3 +67,15 @@ describe("--min-prob", () => {
     await expect(main(["--help", "--min-prob", value])).resolves.toBe(0);
   });
 });
+
+describe("--base-url", () => {
+  it.each(["", "--json", "not-a-url", "file:///tmp/api"])("rejects invalid URL %j", async (value) => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(main(["--help", "--base-url", value])).resolves.toBe(2);
+  });
+
+  it("accepts an HTTP endpoint", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await expect(main(["--help", "--base-url", "http://localhost:8000"])).resolves.toBe(0);
+  });
+});

@@ -1,5 +1,5 @@
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { scanProject } from "../src/scan";
 import type { JevResult } from "../src/jev";
 import { formatReport } from "../src/report";
@@ -19,6 +19,29 @@ describe("scanProject", () => {
     expect(ask.calls).toBe(report.chunks);
     expect(report.usage.requests).toBe(report.chunks);
     expect(report.usage.inputTokens).toBe(report.chunks * 100);
+  });
+
+  it("leaves provider pricing unknown for a custom endpoint", async () => {
+    const report = await scanProject({
+      root: benign,
+      ask: scriptedAsker(() => lowAnswers()),
+      baseURL: "http://localhost:8000",
+    });
+    expect(report.usage.inputTokens).toBeGreaterThan(0);
+    expect(report.usage.billedUsd).toBeNull();
+    expect(report.usage.pricePerMillionInputTokens).toBeNull();
+    expect(formatReport(report)).toContain("cost depends on provider");
+    expect(formatReport(report)).not.toContain("(free)");
+  });
+
+  it("recognizes a custom endpoint set through the SDK environment variable", async () => {
+    vi.stubEnv("TYPESAFE_BASE_URL", "http://localhost:8000");
+    try {
+      const report = await scanProject({ root: benign, ask: scriptedAsker(() => lowAnswers()) });
+      expect(report.usage.billedUsd).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("escalates the dropper and reports hot categories with source lines", async () => {

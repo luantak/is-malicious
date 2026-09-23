@@ -1,6 +1,6 @@
 ---
 name: is-malicious
-description: Scans a cloned or local codebase for covert, deceptive, or data-stealing behavior with the is-malicious CLI (TypeSafe Jev). Use immediately after git clone, when the user asks if a repo is safe, malicious, suspicious, or hostile, or when they ask to scan a project before installing or running it.
+description: Scans a cloned or local codebase for covert, deceptive, or data-stealing behavior with the is-malicious CLI. Use immediately after git clone, when the user asks if a repo is safe, malicious, suspicious, or hostile, or when they ask to scan a project before installing or running it.
 ---
 
 # is-malicious
@@ -35,7 +35,7 @@ scripts/run.sh <path>
 
 The script prints the human report on stdout. Exit code 1 means at least one high finding. Exit 2 means the scanner or key is missing.
 
-Needs `TYPESAFE_API_KEY`. Optional: `IS_MALICIOUS_ROOT` for a local checkout.
+Needs `TYPESAFE_API_KEY`. For a TypeSafe-compatible provider, set `TYPESAFE_BASE_URL` and `TYPESAFE_DEFAULT_MODEL` as needed. Optional: `IS_MALICIOUS_ROOT` for a local checkout.
 
 Do not pass `--json` unless the user asked for machine output.
 

@@ -72,8 +72,10 @@ function formatUsage(report: ScanReport): string {
   return [
     `${usage.requests} requests`,
     `input ${usage.inputTokens} tok`,
-    `output ${usage.outputTokens} tok (free)`,
-    `billed $${usage.billedUsd.toFixed(4)} at $${usage.pricePerMillionInputTokens}/Mtok input`,
+    `output ${usage.outputTokens} tok${usage.billedUsd === null ? "" : " (free)"}`,
+    usage.billedUsd === null || usage.pricePerMillionInputTokens === null
+      ? "cost depends on provider"
+      : `billed $${usage.billedUsd.toFixed(4)} at $${usage.pricePerMillionInputTokens}/Mtok input`,
   ].join("   ");
 }
 
