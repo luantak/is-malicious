@@ -9,6 +9,7 @@ interface CliArgs {
   root: string;
   json: boolean;
   model?: string;
+  baseURL?: string;
   concurrency?: number;
   minProb?: number;
   diffFrom?: string;
@@ -27,6 +28,21 @@ function parseArgs(argv: string[]): CliArgs {
       args.help = true;
     } else if (token === "--model") {
       args.model = argv[++i];
+    } else if (token === "--base-url") {
+      const raw = argv[++i];
+      if (!raw || raw.startsWith("-")) {
+        throw new Error("--base-url requires an HTTP or HTTPS URL");
+      }
+      let url: URL;
+      try {
+        url = new URL(raw);
+      } catch {
+        throw new Error("--base-url requires an HTTP or HTTPS URL");
+      }
+      if (url.protocol !== "http:" && url.protocol !== "https:") {
+        throw new Error("--base-url requires an HTTP or HTTPS URL");
+      }
+      args.baseURL = raw;
     } else if (token === "--concurrency") {
       args.concurrency = Number(argv[++i]);
     } else if (token === "--min-prob") {
@@ -61,12 +77,13 @@ function usage(): string {
     "Options:",
     "  --json              Print the full report as JSON",
     "  --model <name>      Jev model (default: jev-latest)",
+    "  --base-url <url>   TypeSafe-compatible API root (default: https://api.typesafe.ai)",
     `  --concurrency <n>   Parallel chunk requests (default: ${DEFAULT_CONCURRENCY})`,
     "  --min-prob <n>      Minimum category probability to report (default: 0.40)",
     "  --diff-from <ref>   Only scan files changed since a git ref (for example origin/main)",
     "  -h, --help          Show this help",
     "",
-    "Set TYPESAFE_API_KEY in the environment.",
+    "Set TYPESAFE_API_KEY in the environment. TYPESAFE_BASE_URL also sets the API root.",
   ].join("\n");
 }
 
@@ -99,6 +116,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   const report = await scanProject({
     root: args.root,
     model: args.model,
+    baseURL: args.baseURL,
     concurrency,
     diffFrom: args.diffFrom,
     thresholds: args.minProb === undefined ? undefined : { reportProbability: args.minProb },

@@ -13,7 +13,7 @@ if [[ ! -e "$target" ]]; then
 fi
 
 if [[ -z "${TYPESAFE_API_KEY:-}" ]]; then
-  echo "is-malicious: TYPESAFE_API_KEY is not set. The scan talks to TypeSafe Jev and will not run without it." >&2
+  echo "is-malicious: TYPESAFE_API_KEY is not set. The scan needs an API key for the configured endpoint." >&2
   exit 2
 fi
 

@@ -48,8 +48,8 @@ export interface ScanUsage {
   requests: number;
   inputTokens: number;
   outputTokens: number;
-  billedUsd: number;
-  pricePerMillionInputTokens: number;
+  billedUsd: number | null;
+  pricePerMillionInputTokens: number | null;
 }
 
 export const INPUT_PRICE_PER_MTOK = 0.042;
@@ -101,6 +101,7 @@ export interface ScanProgress {
 export interface ScanOptions {
   root: string;
   apiKey?: string;
+  baseURL?: string;
   model?: string;
   checks?: import("./checks/types").SemanticCheck[];
   thresholds?: Partial<ScanThresholds>;

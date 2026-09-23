@@ -36,7 +36,9 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
   const root = path.resolve(options.root);
   const checks = options.checks ?? listChecks();
   const thresholds = { ...DEFAULT_THRESHOLDS, ...options.thresholds };
-  const ask = options.ask ?? createJevAsker({ apiKey: options.apiKey });
+  const ask = options.ask ?? createJevAsker({ apiKey: options.apiKey, baseURL: options.baseURL });
+  const baseURL = options.baseURL?.trim() || process.env.TYPESAFE_BASE_URL?.trim();
+  const isTypeSafeEndpoint = !baseURL || baseURL.replace(/\/+$/, "") === "https://api.typesafe.ai";
   const discovered = await discoverFiles(root);
   let files = options.fileFilter ? discovered.filter(options.fileFilter) : discovered;
   if (options.diffFrom) {
@@ -186,8 +188,8 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
       requests,
       inputTokens,
       outputTokens,
-      billedUsd: billedUsd(inputTokens),
-      pricePerMillionInputTokens: INPUT_PRICE_PER_MTOK,
+      billedUsd: isTypeSafeEndpoint ? billedUsd(inputTokens) : null,
+      pricePerMillionInputTokens: isTypeSafeEndpoint ? INPUT_PRICE_PER_MTOK : null,
     },
     findings,
     categoryScores,
@@ -336,6 +338,6 @@ function reasonText(check: SemanticCheck, reasonId: string | undefined, primaryI
   return check.label;
 }
 
-export function createAsker(options?: { apiKey?: string; timeout?: number }): JevAsker {
+export function createAsker(options?: { apiKey?: string; baseURL?: string; timeout?: number }): JevAsker {
   return createJevAsker(options);
 }
