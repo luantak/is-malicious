@@ -1,6 +1,6 @@
 {
   "name": "is-malicious",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Scan a codebase for covert, deceptive, or data-stealing behavior with TypeSafe Jev",
   "bin": {
     "is-malicious": "dist/cli.js"
