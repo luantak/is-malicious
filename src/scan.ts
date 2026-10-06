@@ -1,4 +1,5 @@
 import path from "node:path";
+import { createDecisionsAsker, OPENAI_DECISIONS_MODEL } from "./decisions";
 import { listChecks, type SemanticCheck } from "./checks";
 import { DEFAULT_MAX_CHUNK_CHARS, excerpt, groupFiles, locateWindows, splitForRetry } from "./chunk";
 import { listChangedPaths, pathFilter } from "./diff";
@@ -33,12 +34,18 @@ import {
 } from "./types";
 
 export async function scanProject(options: ScanOptions): Promise<ScanReport> {
+  const provider = resolveProvider(options.provider);
+  options = {
+    ...options,
+    provider,
+    model: resolveModel(provider, options.model),
+  };
   const root = path.resolve(options.root);
   const checks = options.checks ?? listChecks();
   const thresholds = { ...DEFAULT_THRESHOLDS, ...options.thresholds };
-  const ask = options.ask ?? createJevAsker({ apiKey: options.apiKey, baseURL: options.baseURL });
+  const ask = options.ask ?? createAsker(options);
   const baseURL = options.baseURL?.trim() || process.env.TYPESAFE_BASE_URL?.trim();
-  const isTypeSafeEndpoint = !baseURL || baseURL.replace(/\/+$/, "") === "https://api.typesafe.ai";
+  const isTypeSafeEndpoint = options.provider !== "openai" && (!baseURL || baseURL.replace(/\/+$/, "") === "https://api.typesafe.ai");
   const discovered = await discoverFiles(root);
   let files = options.fileFilter ? discovered.filter(options.fileFilter) : discovered;
   if (options.diffFrom) {
@@ -52,7 +59,7 @@ export async function scanProject(options: ScanOptions): Promise<ScanReport> {
   const categoryScores: ScanReport["categoryScores"] = [];
   const skipped: ScanReport["skipped"] = [];
   let escalated = 0;
-  let model = options.model ?? "jev-latest";
+  let model = options.model ?? (options.provider === "openai" ? OPENAI_DECISIONS_MODEL : "jev-latest");
   let requests = 0;
   let inputTokens = 0;
   let outputTokens = 0;
@@ -338,6 +345,26 @@ function reasonText(check: SemanticCheck, reasonId: string | undefined, primaryI
   return check.label;
 }
 
-export function createAsker(options?: { apiKey?: string; baseURL?: string; timeout?: number }): JevAsker {
-  return createJevAsker(options);
+export function createAsker(options: { provider?: "typesafe" | "openai"; apiKey?: string; baseURL?: string; timeout?: number } = {}): JevAsker {
+  const provider = resolveProvider(options.provider);
+  const asker = provider === "openai" ? createDecisionsAsker(options) : createJevAsker(options);
+  return {
+    ask(state, questions, model) {
+      return asker.ask(state, questions, resolveModel(provider, model));
+    },
+  };
+}
+
+function resolveModel(provider: "typesafe" | "openai", explicit?: string): string {
+  return explicit ?? (process.env.IS_MALICIOUS_MODEL?.trim() ||
+    (provider === "openai" ? process.env.OPENAI_DEFAULT_MODEL?.trim() : process.env.TYPESAFE_DEFAULT_MODEL?.trim()) ||
+    (provider === "openai" ? OPENAI_DECISIONS_MODEL : "jev-latest"));
+}
+
+function resolveProvider(explicit?: "typesafe" | "openai"): "typesafe" | "openai" {
+  const provider = explicit ?? (process.env.IS_MALICIOUS_PROVIDER?.trim() || "typesafe");
+  if (provider !== "typesafe" && provider !== "openai") {
+    throw new Error("Unsupported scan provider; IS_MALICIOUS_PROVIDER must be typesafe or openai");
+  }
+  return provider;
 }

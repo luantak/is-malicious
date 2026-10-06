@@ -35,7 +35,9 @@ scripts/run.sh <path>
 
 The script prints the human report on stdout. Exit code 1 means at least one high finding. Exit 2 means the scanner or key is missing.
 
-Needs `TYPESAFE_API_KEY`. For a TypeSafe-compatible provider, set `TYPESAFE_BASE_URL` and `TYPESAFE_DEFAULT_MODEL` as needed. Optional: `IS_MALICIOUS_ROOT` for a local checkout.
+Defaults to TypeSafe and needs `TYPESAFE_API_KEY`. For a TypeSafe-compatible provider, set `TYPESAFE_BASE_URL` and `TYPESAFE_DEFAULT_MODEL` as needed. Optional: `IS_MALICIOUS_ROOT` for a local checkout.
+
+For OpenAI Decisions, set `IS_MALICIOUS_PROVIDER=openai` and `OPENAI_API_KEY`, then use either command above. `OPENAI_BASE_URL` optionally selects its API root and `OPENAI_DEFAULT_MODEL` selects its model. `IS_MALICIOUS_MODEL` overrides the selected provider's model default. Explicit `--provider` and `--model` flags on the CLI take precedence over environment settings.
 
 Do not pass `--json` unless the user asked for machine output.
 

@@ -10,6 +10,13 @@ const suspicious = path.join(__dirname, "../fixtures/suspicious-dropper");
 const telemetry = path.join(__dirname, "../fixtures/with-telemetry");
 
 describe("scanProject", () => {
+  it("uses OpenAI model defaults without assigning TypeSafe pricing", async () => {
+    const report = await scanProject({ root: benign, provider: "openai", ask: scriptedAsker(() => lowAnswers()) });
+    expect(report.usage.billedUsd).toBeNull();
+    expect(report.usage.pricePerMillionInputTokens).toBeNull();
+    const empty = await scanProject({ root: benign, provider: "openai", ask: scriptedAsker(() => lowAnswers()), fileFilter: () => false });
+    expect(empty.model).toBe("gpt-6-luna");
+  });
   it("does not escalate a clean fixture", async () => {
     const ask = scriptedAsker(() => lowAnswers());
     const report = await scanProject({ root: benign, ask, concurrency: 1 });

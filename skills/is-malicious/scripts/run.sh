@@ -12,11 +12,6 @@ if [[ ! -e "$target" ]]; then
   exit 2
 fi
 
-if [[ -z "${TYPESAFE_API_KEY:-}" ]]; then
-  echo "is-malicious: TYPESAFE_API_KEY is not set. The scan needs an API key for the configured endpoint." >&2
-  exit 2
-fi
-
 here="$(cd "$(dirname "$0")" && pwd)"
 
 find_cli() {

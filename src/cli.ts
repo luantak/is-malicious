@@ -7,6 +7,7 @@ import { DEFAULT_CONCURRENCY, type ScanReport } from "./types";
 
 interface CliArgs {
   root: string;
+  provider?: "typesafe" | "openai";
   json: boolean;
   model?: string;
   baseURL?: string;
@@ -26,6 +27,10 @@ function parseArgs(argv: string[]): CliArgs {
       args.json = true;
     } else if (token === "--help" || token === "-h") {
       args.help = true;
+    } else if (token === "--provider") {
+      const provider = argv[++i];
+      if (provider !== "typesafe" && provider !== "openai") throw new Error("--provider must be typesafe or openai");
+      args.provider = provider;
     } else if (token === "--model") {
       args.model = argv[++i];
     } else if (token === "--base-url") {
@@ -72,18 +77,24 @@ function usage(): string {
   return [
     "Usage: is-malicious [path] [options]",
     "",
-    "Scan source, config, build, and CI files with TypeSafe Jev.",
+    "Scan source, config, build, and CI files with TypeSafe Jev or OpenAI Decisions.",
     "",
     "Options:",
     "  --json              Print the full report as JSON",
-    "  --model <name>      Jev model (default: jev-latest)",
-    "  --base-url <url>   TypeSafe-compatible API root (default: https://api.typesafe.ai)",
+    "  --provider <name>  typesafe (default) or openai",
+    "  --model <name>     Model (default: jev-latest or gpt-6-luna)",
+    "  --base-url <url>   API root for the selected provider",
     `  --concurrency <n>   Parallel chunk requests (default: ${DEFAULT_CONCURRENCY})`,
     "  --min-prob <n>      Minimum category probability to report (default: 0.40)",
     "  --diff-from <ref>   Only scan files changed since a git ref (for example origin/main)",
     "  -h, --help          Show this help",
     "",
     "Set TYPESAFE_API_KEY in the environment. TYPESAFE_BASE_URL also sets the API root.",
+    "For openai, set OPENAI_API_KEY; OPENAI_BASE_URL optionally sets the API root.",
+    "IS_MALICIOUS_PROVIDER selects typesafe or openai when --provider is omitted.",
+    "IS_MALICIOUS_MODEL sets the model when --model is omitted, then",
+    "TYPESAFE_DEFAULT_MODEL or OPENAI_DEFAULT_MODEL supplies the provider default.",
+    "Explicit flags take precedence over environment variables.",
   ].join("\n");
 }
 
@@ -115,6 +126,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   const report = await scanProject({
     root: args.root,
+    provider: args.provider,
     model: args.model,
     baseURL: args.baseURL,
     concurrency,

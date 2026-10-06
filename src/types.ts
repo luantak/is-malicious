@@ -100,6 +100,7 @@ export interface ScanProgress {
 
 export interface ScanOptions {
   root: string;
+  provider?: "typesafe" | "openai";
   apiKey?: string;
   baseURL?: string;
   model?: string;

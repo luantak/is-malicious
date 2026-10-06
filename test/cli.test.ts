@@ -69,6 +69,14 @@ describe("--min-prob", () => {
 });
 
 describe("--base-url", () => {
+  it("accepts an explicit OpenAI provider", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await expect(main(["--help", "--provider", "openai"])).resolves.toBe(0);
+  });
+  it.each(["codex", "", "--json"])("rejects invalid provider %j", async (value) => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(main(["--help", "--provider", value])).resolves.toBe(2);
+  });
   it.each(["", "--json", "not-a-url", "file:///tmp/api"])("rejects invalid URL %j", async (value) => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     await expect(main(["--help", "--base-url", value])).resolves.toBe(2);
